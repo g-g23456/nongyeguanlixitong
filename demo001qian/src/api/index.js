@@ -100,12 +100,6 @@ export const systemApi = {
   users(payload = {}) {
     return postAction('/system/users', payload)
   },
-  roles(payload = {}) {
-    return postAction('/system/roles', payload)
-  },
-  permissions(payload = {}) {
-    return postAction('/system/permissions', payload)
-  },
 }
 
 export default {
