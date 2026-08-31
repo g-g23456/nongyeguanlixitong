@@ -533,25 +533,19 @@
                 </tbody>
               </table>
               <div class="pagination" v-if="farmlandTotal > 0">
-                <span>�?{{ farmlandTotal }} �?</span>
+                <span>{{ farmlandTotal }} </span>
                 <button
                   class="btn btn-outline"
                   :disabled="farmlandPage <= 1"
-                  @click="
-                    farmlandPage--
-                    loadFarmlandList()
-                  "
+                  @click="farmlandPage--; loadFarmlandList()"
                 >
                   上一页
                 </button>
-                <span>�?{{ farmlandPage }} / {{ farmlandTotalPages }} �?</span>
+                <span>{{ farmlandPage }} / {{ farmlandTotalPages }} </span>
                 <button
                   class="btn btn-outline"
                   :disabled="farmlandPage >= farmlandTotalPages"
-                  @click="
-                    farmlandPage++
-                    loadFarmlandList()
-                  "
+                  @click="farmlandPage++; loadFarmlandList()"
                 >
                   下一页
                 </button>
