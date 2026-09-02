@@ -1,47 +1,20 @@
 package com.panduoma.demo.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import cn.dev33.satoken.stp.StpUtil;
-import com.panduoma.demo.entity.Famlandoptimize;
 import com.panduoma.demo.entity.FarmlandBlock;
 import com.panduoma.demo.entity.LoginDTO;
 import com.panduoma.demo.entity.User;
-import com.panduoma.demo.entity.Farmlandrotation;
-import com.panduoma.demo.mapper.FarmlandBlockMapper;
-import com.panduoma.demo.mapper.FarmlandOptimizeResultMapper;
-import com.panduoma.demo.mapper.FarmlandRotationMapper;
 import com.panduoma.demo.response.Result;
+import com.panduoma.demo.service.FarmlandService;
 import com.panduoma.demo.service.UserService;
+import com.panduoma.demo.service.WaterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
-import javax.sql.DataSource;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.UUID;
 
 //POST /auth/login   登录
 //POST /auth/me      获取当前用户信息
@@ -51,57 +24,46 @@ import java.util.UUID;
 //POST /farmland/create   创建农田
 //POST /farmland/optimize  ai优化农田布局
 //POST /farmland/rotation  休耕计划
+
 //POST /water/quota     水位配额
-//POST /water/create    配置调整             ****
+//POST /water/create    配置调整
 //POST /water/allocation    ai水位分配
 //POST /water/analysis    水位分析
 //POST /seed/inventory    种子库存
-//POST /seed/create       入库登记   ****
+//POST /seed/create       入库登记
 //POST /seed/allocation  ai需求分配
 //POST /seed/predict   消耗预测与库存预警
 //POST /labor/list    劳动力列表
-//POST /labor/create    新增劳动力   ****
+//POST /labor/create    新增劳动力
 //POST /labor/schedule  智能排班调度
 //POST /equipment/list  农机具台账管理
-//POST /equipment/create  新增设备   ****
+//POST /equipment/create  新增设备
 //POST /equipment/allocation   智能调配与路径优化
 //POST /equipment/maintenance    维护保养管理
 //POST /ai/decision    AI综合决策中心
 //POST /predict/yield   作物产量预测
 //POST /predict/resource   资源需求智能预测
 //POST /system/users    系统用户管理
-//POST /system/create   创建用户    *****
+//POST /system/create   创建用户
 
 @Tag(name = "农业管理系统")
 @RestController
 @RequestMapping("/api")
 public class Controller {
+
     @Resource
     private UserService userService;
 
     @Resource
-    private FarmlandBlockMapper farmlandBlockMapper;
+    private FarmlandService farmlandService;
 
     @Resource
-    private FarmlandOptimizeResultMapper farmlandOptimizeResultMapper;
-
-    @Resource
-    private FarmlandRotationMapper farmlandRotationMapper;
-
-    @Resource
-    private ObjectMapper objectMapper;
-
-    @Resource
-    private DataSource dataSource;
-
-    @Value("${deepseek.api-key:}")
-    private String deepseekApiKey;
-
+    private WaterService waterService;
 
     @Operation(summary = "用户登录")
     @PostMapping("/auth/login")
     public Result<?> login(@RequestBody LoginDTO loginDTO){
-        Result<?> res =  userService.login(loginDTO);
+        Result<?> res = userService.login(loginDTO);
         System.out.println("=== 登录响应: code=" + res.getCode() + ", message=" + res.getMessage() + " ===");
         if (res.getCode() == 200){
             User loginUser = (User) res.getData();
@@ -121,14 +83,18 @@ public class Controller {
         Long uId = StpUtil.getLoginIdAsLong();
         return userService.getUserById(uId);
     }
-    
+
     @Operation(summary = "用户登出")
     @PostMapping("/auth/logout")
-    public Result<?> logout(){
-        Long uId = StpUtil.getLoginIdAsLong();
-        userService.logout(uId);
-        StpUtil.logout();
-        return Result.success("退出登录成功");
+    public Result<?> logout(@RequestBody User user){
+        System.out.println("=== 登出请求: id=" + user.getId() + ", username=" + user.getUsername() + ", role=" + user.getRole() + " ===");
+        // 1. 根据前端传来的 id 更新数据库 status 为 0，记录登出时间
+        Result<?> result = userService.logout(user);
+        // 2. 删除 Redis 中该用户的 sa-token
+        if (user.getId() != null) {
+            StpUtil.logout(user.getId());
+        }
+        return result;
     }
 
     @Operation(summary = "地块台账")
@@ -136,288 +102,32 @@ public class Controller {
     public Result<?> farmlandList(@RequestBody FarmlandListRequest request) {
         int page = request != null && request.getPage() != null ? Math.max(1, request.getPage()) : 1;
         int size = request != null && request.getPageSize() != null ? Math.max(1, request.getPageSize()) : 20;
-
-        Page<FarmlandBlock> resultPage = farmlandBlockMapper.selectPage(new Page<>(page, size), new QueryWrapper<>());
-
-        Map<String, Object> pageResult = new HashMap<>();
-        pageResult.put("current", resultPage.getCurrent());
-        pageResult.put("size", resultPage.getSize());
-        pageResult.put("total", resultPage.getTotal());
-        pageResult.put("records", resultPage.getRecords());
-        return Result.data(pageResult);
+        return farmlandService.farmlandList(page, size);
     }
 
     @Operation(summary = "创建耕地地块")
     @PostMapping("/farmland/create")
     public Result<?> farmlandCreate(@RequestBody FarmlandBlock farmlandBlock) {
-        if (farmlandBlock == null) {
-            return Result.error("请求参数不能为空");
-        }
-        if (!StringUtils.hasText(farmlandBlock.getBlockCode())) {
-            return Result.error("地块编码不能为空");
-        }
-        if (!StringUtils.hasText(farmlandBlock.getBlockName())) {
-            return Result.error("地块名称不能为空");
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        farmlandBlock.setCreatedAt(now);
-        farmlandBlock.setUpdatedAt(now);
-
-        farmlandBlockMapper.insert(farmlandBlock);
-        return Result.data(farmlandBlock);
+        return farmlandService.farmlandCreate(farmlandBlock);
     }
 
     @Operation(summary = "耕地 AI 优化结果写入")
     @PostMapping("/farmland/optimize")
     public Result<?> farmlandOptimize(@RequestBody Map<String, Object> request) {
-        if (request == null || request.isEmpty()) {
-            return Result.error("请求参数不能为空");
-        }
-
-        try {
-            String taskId = String.valueOf(request.getOrDefault("taskId", UUID.randomUUID().toString().replace("-", "")));
-            List<Map<String, Object>> rotationContext = fetchRotationContext();
-            String prompt = buildDeepseekPrompt(request, rotationContext);
-            Map<String, Object> deepseekResult = callDeepseek(prompt);
-
-            Map<String, Object> payloadToSave = new LinkedHashMap<>();
-            payloadToSave.put("taskId", taskId);
-            payloadToSave.put("question", request);
-            payloadToSave.put("rotationContext", rotationContext);
-            payloadToSave.put("prompt", prompt);
-
-            Famlandoptimize optimize = Famlandoptimize.builder()
-                    .taskId(taskId)
-                    .requestPayload(objectMapper.writeValueAsString(payloadToSave))
-                    .result(objectMapper.writeValueAsString(deepseekResult))
-                    .createdAt(LocalDateTime.now())
-                    .build();
-
-            farmlandOptimizeResultMapper.insert(optimize);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("id", optimize.getId());
-            response.put("taskId", optimize.getTaskId());
-            response.putAll(deepseekResult);
-            return Result.data(response);
-        } catch (Exception e) {
-            return Result.error("AI 优化执行失败：" + e.getMessage());
-        }
-    }
-
-    private List<Map<String, Object>> fetchRotationContext() {
-        List<Map<String, Object>> rows = new ArrayList<>();
-        String sql = "SELECT * FROM farmland_rotation ORDER BY id DESC LIMIT 20";
-
-        try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
-
-            ResultSetMetaData metaData = resultSet.getMetaData();
-            while (resultSet.next()) {
-                Map<String, Object> row = new LinkedHashMap<>();
-                for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                    String columnName = metaData.getColumnLabel(i);
-                    row.put(columnName, resultSet.getObject(i));
-                }
-                rows.add(row);
-            }
-        } catch (SQLException ignored) {
-            return rows;
-        }
-        return rows;
-    }
-
-    private String buildDeepseekPrompt(Map<String, Object> request, List<Map<String, Object>> rotationContext) throws JsonProcessingException {
-        Map<String, Object> constraints = request.containsKey("constraints") && request.get("constraints") instanceof Map
-                ? (Map<String, Object>) request.get("constraints")
-                : new HashMap<>();
-
-        StringBuilder prompt = new StringBuilder();
-        prompt.append("你是农业种植优化专家。请根据当前地区、地块属性和轮作规律，给出最佳作物配置方案。\n");
-        prompt.append("用户需求：\n");
-        prompt.append("年份：").append(request.getOrDefault("year", "当前年")).append("\n");
-        prompt.append("优化目标：").append(request.getOrDefault("optimizationGoal", "maximizeYield")).append("\n");
-        prompt.append("目标描述：").append(request.getOrDefault("objectiveLabel", "产量最大化")).append("\n");
-        prompt.append("约束条件：").append(objectMapper.writeValueAsString(constraints)).append("\n");
-
-        if (rotationContext != null && !rotationContext.isEmpty()) {
-            prompt.append("参考的地区与土地轮作历史数据：\n");
-            prompt.append(objectMapper.writeValueAsString(rotationContext.subList(0, Math.min(rotationContext.size(), 10)))).append("\n");
-        } else {
-            prompt.append("参考数据：无 farmland_rotation 表数据，按常规农作物适宜性和区域种植规则进行推断。\n");
-        }
-
-        prompt.append("请输出严格的 JSON，字段必须包含：cropDistribution、blockSuitability、optimizationMetrics。\n");
-        prompt.append("cropDistribution 是数组，每个对象包含 name 和 percentage，百分比总和需约为 100。\n");
-        prompt.append("blockSuitability 是数组，每个对象包含 blockId、blockCode、recommendedCrop、suitabilityScore。\n");
-        prompt.append("optimizationMetrics 是对象，包含 objectiveConvergence 和 constraintSatisfactionRate。\n");
-        prompt.append("不要输出 Markdown 代码块，只输出纯 JSON。\n");
-        return prompt.toString();
-    }
-
-    private Map<String, Object> callDeepseek(String prompt) throws Exception {
-        String apiKey = StringUtils.hasText(deepseekApiKey)
-                ? deepseekApiKey
-                : System.getenv().getOrDefault("DEEPSEEK_API_KEY", "");
-        if (!StringUtils.hasText(apiKey)) {
-            return buildFallbackResult();
-        }
-
-        String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("model", "deepseek-chat");
-        payload.put("temperature", 0.2);
-        payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/v1/chat/completions"))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-                .build();
-
-        HttpClient httpClient = HttpClient.newHttpClient();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 400) {
-            throw new IllegalStateException("DeepSeek API 调用失败，HTTP 状态：" + response.statusCode() + "，响应：" + response.body());
-        }
-
-        Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
-        if (choices == null || choices.isEmpty()) {
-            return buildFallbackResult();
-        }
-
-        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-        String content = Objects.toString(message.get("content"), "");
-        String cleanJson = content.trim();
-        if (cleanJson.startsWith("```")) {
-            cleanJson = cleanJson.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
-        }
-
-        Map<String, Object> result = objectMapper.readValue(cleanJson, Map.class);
-        return normalizeOptimizationResult(result);
-    }
-
-    private Map<String, Object> buildFallbackResult() {
-        Map<String, Object> result = new LinkedHashMap<>();
-
-        List<Map<String, Object>> cropDistribution = new ArrayList<>();
-        cropDistribution.add(Map.of("name", "水稻", "percentage", 38.5));
-        cropDistribution.add(Map.of("name", "小麦", "percentage", 27.0));
-        cropDistribution.add(Map.of("name", "玉米", "percentage", 24.5));
-        cropDistribution.add(Map.of("name", "大豆", "percentage", 10.0));
-
-        List<Map<String, Object>> blockSuitability = new ArrayList<>();
-        blockSuitability.add(Map.of(
-                "blockId", 101,
-                "blockCode", "F001",
-                "recommendedCrop", "水稻",
-                "suitabilityScore", 92
-        ));
-
-        Map<String, Object> metrics = new LinkedHashMap<>();
-        metrics.put("objectiveConvergence", 0.987);
-        metrics.put("constraintSatisfactionRate", 0.96);
-
-        result.put("cropDistribution", cropDistribution);
-        result.put("blockSuitability", blockSuitability);
-        result.put("optimizationMetrics", metrics);
-        return result;
-    }
-
-    private Map<String, Object> normalizeOptimizationResult(Map<String, Object> result) {
-        Map<String, Object> normalized = new LinkedHashMap<>();
-        normalized.put("cropDistribution", result.getOrDefault("cropDistribution", buildFallbackResult().get("cropDistribution")));
-        normalized.put("blockSuitability", result.getOrDefault("blockSuitability", buildFallbackResult().get("blockSuitability")));
-
-        Map<String, Object> metrics = result.get("optimizationMetrics") instanceof Map
-                ? (Map<String, Object>) result.get("optimizationMetrics")
-                : new LinkedHashMap<>();
-        Map<String, Object> safeMetrics = new LinkedHashMap<>();
-        safeMetrics.put("objectiveConvergence", metrics.getOrDefault("objectiveConvergence", 0.95));
-        safeMetrics.put("constraintSatisfactionRate", metrics.getOrDefault("constraintSatisfactionRate", 0.95));
-        normalized.put("optimizationMetrics", safeMetrics);
-        return normalized;
+        return farmlandService.farmlandOptimize(request);
     }
 
     @Operation(summary = "获取地块轮作历史数据")
     @PostMapping("/farmland/rotation")
     public Result<?> farmlandRotation() {
-        List<Farmlandrotation> records = farmlandRotationMapper.selectList(
-                new QueryWrapper<Farmlandrotation>().orderByAsc("year")
-        );
-
-        // 收集所有年份（有序去重）
-        Set<Integer> yearSet = new TreeSet<>();
-        // year -> cropName -> 面积累加
-        Map<Integer, Map<String, Double>> yearCropMap = new LinkedHashMap<>();
-        // 收集所有作物名称（有序去重）
-        Set<String> cropNameSet = new TreeSet<>();
-
-        for (Farmlandrotation record : records) {
-            if (record.getYear() == null || !StringUtils.hasText(record.getPlan())) {
-                continue;
-            }
-            int year = record.getYear();
-            yearSet.add(year);
-            yearCropMap.computeIfAbsent(year, k -> new LinkedHashMap<>());
-
-            try {
-                Object parsed = objectMapper.readValue(record.getPlan(), Object.class);
-                Map<String, Double> cropMap = yearCropMap.get(year);
-
-                if (parsed instanceof Map) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> planMap = (Map<String, Object>) parsed;
-                    for (Map.Entry<String, Object> entry : planMap.entrySet()) {
-                        String cropName = entry.getKey();
-                        double value = ((Number) entry.getValue()).doubleValue();
-                        cropMap.merge(cropName, value, Double::sum);
-                        cropNameSet.add(cropName);
-                    }
-                } else if (parsed instanceof List) {
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> planList = (List<Map<String, Object>>) parsed;
-                    for (Map<String, Object> item : planList) {
-                        String cropName = Objects.toString(item.get("name"), "");
-                        if (cropName.isEmpty()) continue;
-                        double value = 0;
-                        if (item.containsKey("value")) {
-                            value = ((Number) item.get("value")).doubleValue();
-                        } else if (item.containsKey("area")) {
-                            value = ((Number) item.get("area")).doubleValue();
-                        }
-                        Map<String, Double> cm = yearCropMap.get(year);
-                        cm.merge(cropName, value, Double::sum);
-                        cropNameSet.add(cropName);
-                    }
-                }
-            } catch (Exception ignored) {
-            }
-        }
-
-        List<String> years = yearSet.stream().map(String::valueOf).toList();
-
-        List<Map<String, Object>> series = new ArrayList<>();
-        for (String cropName : cropNameSet) {
-            List<Double> data = new ArrayList<>();
-            for (Integer year : yearSet) {
-                Map<String, Double> cropMap = yearCropMap.get(year);
-                data.add(cropMap != null ? cropMap.getOrDefault(cropName, 0.0) : 0.0);
-            }
-            Map<String, Object> s = new LinkedHashMap<>();
-            s.put("name", cropName);
-            s.put("data", data);
-            series.add(s);
-        }
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("years", years);
-        result.put("series", series);
-        return Result.data(result);
+        return farmlandService.farmlandRotation();
     }
-         
+
+    @Operation(summary = "水位配额")
+    @PostMapping("/water/quota")
+    public Result<?> waterQuota(@RequestBody(required = false) FarmlandListRequest request) {
+        int page = request != null && request.getPage() != null ? Math.max(1, request.getPage()) : 1;
+        int size = request != null && request.getPageSize() != null ? Math.max(1, request.getPageSize()) : 20;
+        return waterService.waterQuota(page, size);
+    }
 }

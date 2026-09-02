@@ -88,8 +88,12 @@ public class UserServiceimpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public Result<?> logout(Long u_id) {
-        User user = baseMapper.selectById(u_id);
+    public Result<?> logout(User userParam) {
+        if (userParam == null || userParam.getId() == null) {
+            return Result.error("用户ID不能为空");
+        }
+
+        User user = baseMapper.selectById(userParam.getId());
         if (user == null) {
             return Result.error("用户不存在");
         }
@@ -97,7 +101,7 @@ public class UserServiceimpl extends ServiceImpl<UserMapper, User> implements Us
         // 查找该用户最近一条未记录登出时间的登录日志
         LoginLog loginLog = loginLogMapper.selectOne(
                 new LambdaUpdateWrapper<LoginLog>()
-                        .eq(LoginLog::getUId, u_id)
+                        .eq(LoginLog::getUId, userParam.getId())
                         .isNull(LoginLog::getLogoutTime)
                         .orderByDesc(LoginLog::getLoginTime)
                         .last("LIMIT 1")

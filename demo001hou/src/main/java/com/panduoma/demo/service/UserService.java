@@ -9,5 +9,5 @@ public interface UserService extends IService<User> {
     Result<?> login(LoginDTO loginDTO);
     Result<?> updateUserStatus(Long userId, Integer status);
     Result<?> getUserById(Long userId);
-    Result<?> logout(Long u_id);
+    Result<?> logout(User user);
 }
