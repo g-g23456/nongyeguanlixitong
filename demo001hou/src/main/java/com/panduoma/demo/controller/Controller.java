@@ -2,6 +2,7 @@ package com.panduoma.demo.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.panduoma.demo.entity.FarmlandBlock;
+import com.panduoma.demo.entity.FarmlandOptimizeRequest;
 import com.panduoma.demo.entity.LoginDTO;
 import com.panduoma.demo.entity.User;
 import com.panduoma.demo.response.Result;
@@ -25,6 +26,7 @@ import java.util.Map;
 //POST /farmland/optimize  ai优化农田布局
 //POST /farmland/rotation  休耕计划
 
+//POST /water/status
 //POST /water/quota     水位配额
 //POST /water/create    配置调整
 //POST /water/allocation    ai水位分配
@@ -88,9 +90,7 @@ public class Controller {
     @PostMapping("/auth/logout")
     public Result<?> logout(@RequestBody User user){
         System.out.println("=== 登出请求: id=" + user.getId() + ", username=" + user.getUsername() + ", role=" + user.getRole() + " ===");
-        // 1. 根据前端传来的 id 更新数据库 status 为 0，记录登出时间
         Result<?> result = userService.logout(user);
-        // 2. 删除 Redis 中该用户的 sa-token
         if (user.getId() != null) {
             StpUtil.logout(user.getId());
         }
@@ -113,14 +113,15 @@ public class Controller {
 
     @Operation(summary = "耕地 AI 优化结果写入")
     @PostMapping("/farmland/optimize")
-    public Result<?> farmlandOptimize(@RequestBody Map<String, Object> request) {
+    public Result<?> farmlandOptimize(@RequestBody FarmlandOptimizeRequest request) {
         return farmlandService.farmlandOptimize(request);
     }
 
     @Operation(summary = "获取地块轮作历史数据")
     @PostMapping("/farmland/rotation")
-    public Result<?> farmlandRotation() {
-        return farmlandService.farmlandRotation();
+    public Result<?> farmlandRotation(@RequestBody Map<String, Object> request) {
+        Integer year = request != null && request.get("year") != null ? ((Number) request.get("year")).intValue() : null;
+        return farmlandService.farmlandRotation(year);
     }
 
     @Operation(summary = "水位配额")
@@ -129,5 +130,16 @@ public class Controller {
         int page = request != null && request.getPage() != null ? Math.max(1, request.getPage()) : 1;
         int size = request != null && request.getPageSize() != null ? Math.max(1, request.getPageSize()) : 20;
         return waterService.waterQuota(page, size);
+    }
+
+    @Operation(summary = "当前水分配")
+    @PostMapping("/water/status")
+    public Result<?> waterStatus() {
+        return waterService.waterStatus();
+    }
+    @Operation(summary = "AI 水位分配")
+    @PostMapping("/water/allocation")
+    public Result<?> waterAllocation(@RequestBody Map<String, Object> request) {
+        return waterService.waterAllocation(request);
     }
 }

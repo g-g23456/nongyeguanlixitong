@@ -1,9 +1,8 @@
 package com.panduoma.demo.service;
 
 import com.panduoma.demo.entity.FarmlandBlock;
+import com.panduoma.demo.entity.FarmlandOptimizeRequest;
 import com.panduoma.demo.response.Result;
-
-import java.util.Map;
 
 public interface FarmlandService {
 
@@ -20,10 +19,10 @@ public interface FarmlandService {
     /**
      * AI 优化农田布局
      */
-    Result<?> farmlandOptimize(Map<String, Object> request);
+    Result<?> farmlandOptimize(FarmlandOptimizeRequest request);
 
     /**
      * 获取地块轮作历史数据
      */
-    Result<?> farmlandRotation();
+    Result<?> farmlandRotation(Integer year);
 }

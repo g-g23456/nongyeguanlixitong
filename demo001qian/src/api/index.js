@@ -40,6 +40,9 @@ export const waterApi = {
   quota(payload = {}) {
     return postAction('/water/quota', payload)
   },
+  status(payload = {}) {
+    return postAction('/water/status', payload)
+  },
   allocation(payload = {}) {
     return postAction('/water/allocation', payload)
   },

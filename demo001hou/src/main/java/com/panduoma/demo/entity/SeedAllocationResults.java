@@ -28,12 +28,6 @@ public class SeedAllocationResults {
     @TableField("request")
     private String request;
 
-    @TableField("allocation")
-    private String allocation;
-
-    @TableField("metrics")
-    private String metrics;
-
     @TableField("created_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;

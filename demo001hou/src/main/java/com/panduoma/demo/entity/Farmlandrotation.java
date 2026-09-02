@@ -25,8 +25,8 @@ public class Farmlandrotation {
     @TableField("block_id")
     private Long blockId;
 
-    @TableField("year")
-    private Integer year;
+    @TableField("mouth")
+    private Integer mouth;
 
     @TableField("plan")
     private String plan;

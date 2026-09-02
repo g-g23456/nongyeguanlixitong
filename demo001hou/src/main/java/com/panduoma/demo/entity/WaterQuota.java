@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,8 +25,24 @@ public class WaterQuota {
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
+    @TableField("total_quota")
+    private BigDecimal totalQuota;
+
+    @TableField("used_quota")
+    private BigDecimal usedQuota;
+
+    @TableField("residue_quota")
+    private BigDecimal residueQuota;
+
+    @TableField("all_usage_rate")
+    private BigDecimal allUsageRate;
+
+    @JsonIgnore
     @TableField("region_id")
     private Long regionId;
+
+    @TableField(exist = false)
+    private String regionName;
 
     @TableField("period")
     private String period;

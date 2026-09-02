@@ -1,10 +1,8 @@
 package com.panduoma.demo.entity;
-
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,22 +12,21 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@TableName("water_analysis")
-public class WaterAnalysis {
+@TableName("regions")
+public class Region {
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @JsonIgnore
-    @TableField("region_id")
-    private Long regionId;
+    @TableField("code")
+    private String code;
 
-    @TableField(exist = false)
-    private String regionName;
+    @TableField("name")
+    private String name;
 
-    @TableField("year")
-    private Integer year;
+    @TableField("parent_id")
+    private Long parentId;
 
-    @TableField("analysis_result")
-    private String analysisResult;
+    @TableField("meta")
+    private String meta;
 }

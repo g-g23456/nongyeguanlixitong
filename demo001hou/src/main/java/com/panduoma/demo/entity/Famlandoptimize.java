@@ -28,9 +28,6 @@ public class Famlandoptimize {
     @TableField("request_payload")
     private String requestPayload;
 
-    @TableField("result")
-    private String result;
-
     @TableField("created_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;

@@ -6,10 +6,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.panduoma.demo.entity.Famlandoptimize;
 import com.panduoma.demo.entity.FarmlandBlock;
+import com.panduoma.demo.entity.FarmlandOptimizeRequest;
 import com.panduoma.demo.entity.Farmlandrotation;
+import com.panduoma.demo.entity.Region;
 import com.panduoma.demo.mapper.FarmlandBlockMapper;
 import com.panduoma.demo.mapper.FarmlandOptimizeResultMapper;
 import com.panduoma.demo.mapper.FarmlandRotationMapper;
+import com.panduoma.demo.mapper.RegionMapper;
 import com.panduoma.demo.response.Result;
 import com.panduoma.demo.service.FarmlandService;
 import jakarta.annotation.Resource;
@@ -17,16 +20,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import javax.sql.DataSource;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,10 +48,10 @@ public class FarmlandServiceImpl implements FarmlandService {
     private FarmlandRotationMapper farmlandRotationMapper;
 
     @Resource
-    private ObjectMapper objectMapper;
+    private RegionMapper regionMapper;
 
     @Resource
-    private DataSource dataSource;
+    private ObjectMapper objectMapper;
 
     @Value("${deepseek.api-key:}")
     private String deepseekApiKey;
@@ -66,11 +63,28 @@ public class FarmlandServiceImpl implements FarmlandService {
 
         Page<FarmlandBlock> resultPage = farmlandBlockMapper.selectPage(new Page<>(page, size), new QueryWrapper<>());
 
+        // 填充片区名称
+        List<FarmlandBlock> records = resultPage.getRecords();
+        Set<Long> regionIds = records.stream()
+                .map(FarmlandBlock::getRegionId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        if (!regionIds.isEmpty()) {
+            List<Region> regions = regionMapper.selectBatchIds(regionIds);
+            Map<Long, String> regionNameMap = regions.stream()
+                    .collect(java.util.stream.Collectors.toMap(Region::getId, Region::getName, (a, b) -> a));
+            for (FarmlandBlock record : records) {
+                if (record.getRegionId() != null) {
+                    record.setRegionName(regionNameMap.get(record.getRegionId()));
+                }
+            }
+        }
+
         Map<String, Object> pageResult = new HashMap<>();
         pageResult.put("current", resultPage.getCurrent());
         pageResult.put("size", resultPage.getSize());
         pageResult.put("total", resultPage.getTotal());
-        pageResult.put("records", resultPage.getRecords());
+        pageResult.put("records", records);
         return Result.data(pageResult);
     }
 
@@ -95,63 +109,78 @@ public class FarmlandServiceImpl implements FarmlandService {
     }
 
     @Override
-    public Result<?> farmlandOptimize(Map<String, Object> request) {
-        if (request == null || request.isEmpty()) {
-            return Result.error("请求参数不能为空");
+    public Result<?> farmlandOptimize(FarmlandOptimizeRequest request) {
+        if (request == null || request.getYear() == null) {
+            return Result.error("年份参数不能为空");
         }
 
         try {
-            String taskId = String.valueOf(request.getOrDefault("taskId", UUID.randomUUID().toString().replace("-", "")));
-            List<Map<String, Object>> rotationContext = fetchRotationContext();
-            String prompt = buildDeepseekPrompt(request, rotationContext);
+            // 根据 year 查询 farmland_blocks 数据
+            List<FarmlandBlock> blocks = farmlandBlockMapper.selectList(
+                    new QueryWrapper<FarmlandBlock>()
+                            .likeRight("stat_month", request.getYear().toString())
+            );
+
+            // 构建 prompt，包含地块数据
+            String prompt = buildDeepseekPrompt(request, blocks);
             Map<String, Object> deepseekResult = callDeepseek(prompt);
 
+            // 保存调用记录
             Map<String, Object> payloadToSave = new LinkedHashMap<>();
-            payloadToSave.put("taskId", taskId);
-            payloadToSave.put("question", request);
-            payloadToSave.put("rotationContext", rotationContext);
+            payloadToSave.put("goal", request.getGoal());
+            payloadToSave.put("constraintMode", request.getConstraintMode());
+            payloadToSave.put("year", request.getYear());
+            payloadToSave.put("blockCount", blocks.size());
             payloadToSave.put("prompt", prompt);
 
             Famlandoptimize optimize = Famlandoptimize.builder()
-                    .taskId(taskId)
+                    .taskId(UUID.randomUUID().toString().replace("-", ""))
                     .requestPayload(objectMapper.writeValueAsString(payloadToSave))
-                    .result(objectMapper.writeValueAsString(deepseekResult))
                     .createdAt(LocalDateTime.now())
                     .build();
-
             farmlandOptimizeResultMapper.insert(optimize);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("id", optimize.getId());
-            response.put("taskId", optimize.getTaskId());
-            response.putAll(deepseekResult);
-            return Result.data(response);
+            // 返回 DeepSeek 结果
+            return Result.data(deepseekResult);
         } catch (Exception e) {
             return Result.error("AI 优化执行失败：" + e.getMessage());
         }
     }
 
     @Override
-    public Result<?> farmlandRotation() {
+    public Result<?> farmlandRotation(Integer year) {
+        if (year == null) {
+            return Result.error("年份参数不能为空");
+        }
+
+        int yearStart = year * 100;
+        int yearEnd = yearStart + 99;
+
         List<Farmlandrotation> records = farmlandRotationMapper.selectList(
-                new QueryWrapper<Farmlandrotation>().orderByAsc("year")
+                new QueryWrapper<Farmlandrotation>()
+                        .ge("mouth", yearStart)
+                        .le("mouth", yearEnd)
+                        .orderByAsc("mouth")
         );
 
-        Set<Integer> yearSet = new TreeSet<>();
-        Map<Integer, Map<String, Double>> yearCropMap = new LinkedHashMap<>();
+        // monthIndex(1~12) -> cropName -> aggregated value
+        Map<Integer, Map<String, Double>> monthCropMap = new LinkedHashMap<>();
         Set<String> cropNameSet = new TreeSet<>();
 
         for (Farmlandrotation record : records) {
-            if (record.getYear() == null || !StringUtils.hasText(record.getPlan())) {
+            if (record.getMouth() == null || !StringUtils.hasText(record.getPlan())) {
                 continue;
             }
-            int year = record.getYear();
-            yearSet.add(year);
-            yearCropMap.computeIfAbsent(year, k -> new LinkedHashMap<>());
+            int monthIndex = record.getMouth() - yearStart + 1;
+            if (monthIndex < 1 || monthIndex > 12) {
+                continue;
+            }
+
+            monthCropMap.computeIfAbsent(monthIndex, k -> new LinkedHashMap<>());
 
             try {
                 Object parsed = objectMapper.readValue(record.getPlan(), Object.class);
-                Map<String, Double> cropMap = yearCropMap.get(year);
+                Map<String, Double> cropMap = monthCropMap.get(monthIndex);
 
                 if (parsed instanceof Map) {
                     @SuppressWarnings("unchecked")
@@ -174,8 +203,7 @@ public class FarmlandServiceImpl implements FarmlandService {
                         } else if (item.containsKey("area")) {
                             value = ((Number) item.get("area")).doubleValue();
                         }
-                        Map<String, Double> cm = yearCropMap.get(year);
-                        cm.merge(cropName, value, Double::sum);
+                        cropMap.merge(cropName, value, Double::sum);
                         cropNameSet.add(cropName);
                     }
                 }
@@ -183,70 +211,39 @@ public class FarmlandServiceImpl implements FarmlandService {
             }
         }
 
-        List<String> years = yearSet.stream().map(String::valueOf).toList();
-
-        List<Map<String, Object>> series = new ArrayList<>();
+        // 每种作物生成 12 个月的数据数组
+        List<Map<String, Object>> crops = new ArrayList<>();
         for (String cropName : cropNameSet) {
             List<Double> data = new ArrayList<>();
-            for (Integer year : yearSet) {
-                Map<String, Double> cropMap = yearCropMap.get(year);
+            for (int m = 1; m <= 12; m++) {
+                Map<String, Double> cropMap = monthCropMap.get(m);
                 data.add(cropMap != null ? cropMap.getOrDefault(cropName, 0.0) : 0.0);
             }
-            Map<String, Object> s = new LinkedHashMap<>();
-            s.put("name", cropName);
-            s.put("data", data);
-            series.add(s);
+            Map<String, Object> crop = new LinkedHashMap<>();
+            crop.put("name", cropName);
+            crop.put("data", data);
+            crops.add(crop);
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("years", years);
-        result.put("series", series);
+        result.put("crops", crops);
         return Result.data(result);
     }
 
     // ==================== 私有辅助方法 ====================
 
-    private List<Map<String, Object>> fetchRotationContext() {
-        List<Map<String, Object>> rows = new ArrayList<>();
-        String sql = "SELECT * FROM farmland_rotation ORDER BY id DESC LIMIT 20";
-
-        try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
-
-            ResultSetMetaData metaData = resultSet.getMetaData();
-            while (resultSet.next()) {
-                Map<String, Object> row = new LinkedHashMap<>();
-                for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                    String columnName = metaData.getColumnLabel(i);
-                    row.put(columnName, resultSet.getObject(i));
-                }
-                rows.add(row);
-            }
-        } catch (SQLException ignored) {
-            return rows;
-        }
-        return rows;
-    }
-
-    private String buildDeepseekPrompt(Map<String, Object> request, List<Map<String, Object>> rotationContext) throws JsonProcessingException {
-        Map<String, Object> constraints = request.containsKey("constraints") && request.get("constraints") instanceof Map
-                ? (Map<String, Object>) request.get("constraints")
-                : new HashMap<>();
-
+    private String buildDeepseekPrompt(FarmlandOptimizeRequest request, List<FarmlandBlock> blocks) throws JsonProcessingException {
         StringBuilder prompt = new StringBuilder();
-        prompt.append("你是农业种植优化专家。请根据当前地区、地块属性和轮作规律，给出最佳作物配置方案。\n");
-        prompt.append("用户需求：\n");
-        prompt.append("年份：").append(request.getOrDefault("year", "当前年")).append("\n");
-        prompt.append("优化目标：").append(request.getOrDefault("optimizationGoal", "maximizeYield")).append("\n");
-        prompt.append("目标描述：").append(request.getOrDefault("objectiveLabel", "产量最大化")).append("\n");
-        prompt.append("约束条件：").append(objectMapper.writeValueAsString(constraints)).append("\n");
+        prompt.append("你是农业种植优化专家。请根据农田地块数据，给出最佳作物配置方案。\n");
+        prompt.append("优化目标：").append(request.getGoal() != null ? request.getGoal() : "产量最大化").append("\n");
+        prompt.append("约束条件：").append(request.getConstraintMode() != null ? request.getConstraintMode() : "无特殊约束").append("\n");
+        prompt.append("年份：").append(request.getYear()).append("\n\n");
 
-        if (rotationContext != null && !rotationContext.isEmpty()) {
-            prompt.append("参考的地区与土地轮作历史数据：\n");
-            prompt.append(objectMapper.writeValueAsString(rotationContext.subList(0, Math.min(rotationContext.size(), 10)))).append("\n");
+        if (blocks != null && !blocks.isEmpty()) {
+            prompt.append("当前年份的农田地块数据：\n");
+            prompt.append(objectMapper.writeValueAsString(blocks)).append("\n\n");
         } else {
-            prompt.append("参考数据：无 farmland_rotation 表数据，按常规农作物适宜性和区域种植规则进行推断。\n");
+            prompt.append("当前年份无地块数据，按常规农作物适宜性和区域种植规则进行推断。\n\n");
         }
 
         prompt.append("请输出严格的 JSON，字段必须包含：cropDistribution、blockSuitability、optimizationMetrics。\n");

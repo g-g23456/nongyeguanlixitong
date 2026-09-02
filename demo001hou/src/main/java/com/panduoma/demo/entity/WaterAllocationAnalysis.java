@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -35,6 +36,7 @@ public class WaterAllocationAnalysis {
     @TableField("optimize_target")
     private String optimizeTarget;
 
+    @JsonIgnore
     @TableField("region_id")
     private Long regionId;
 
@@ -49,9 +51,6 @@ public class WaterAllocationAnalysis {
 
     @TableField("traditional_usage")
     private BigDecimal traditionalUsage;
-
-    @TableField("ai_allocation")
-    private BigDecimal aiAllocation;
 
     @TableField("water_saving_rate")
     private BigDecimal waterSavingRate;

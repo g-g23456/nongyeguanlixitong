@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Data
 @NoArgsConstructor
@@ -27,8 +28,12 @@ public class FarmlandBlock {
     @TableField("name")
     private String blockName;
 
+    @JsonIgnore
     @TableField("region_id")
     private Long regionId;
+
+    @TableField(exist = false)
+    private String regionName;
 
     @TableField("area")
     private BigDecimal area;
