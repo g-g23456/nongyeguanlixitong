@@ -72,14 +72,23 @@ export const laborApi = {
   list(payload = {}) {
     return postAction('/labor/list', payload)
   },
+  create(payload) {
+    return postAction('/labor/create', payload)
+  },
   schedule(payload = {}) {
     return postAction('/labor/schedule', payload)
+  },
+  oldSchedule(payload = {}) {
+    return postAction('/labor/old/schedule', payload)
   },
 }
 
 export const equipmentApi = {
   list(payload = {}) {
     return postAction('/equipment/list', payload)
+  },
+  create(payload) {
+    return postAction('/equipment/create', payload)
   },
   allocation(payload = {}) {
     return postAction('/equipment/allocation', payload)

@@ -7,6 +7,7 @@ import com.panduoma.demo.entity.LoginDTO;
 import com.panduoma.demo.entity.User;
 import com.panduoma.demo.response.Result;
 import com.panduoma.demo.service.FarmlandService;
+import com.panduoma.demo.service.EquipmentService;
 import com.panduoma.demo.service.LaborService;
 import com.panduoma.demo.service.SeedService;
 import com.panduoma.demo.service.UserService;
@@ -39,6 +40,7 @@ import java.util.Map;
 //POST /seed/predict   消耗预测与库存预警
 //POST /labor/list    劳动力列表
 //POST /labor/create    新增劳动力
+//POST /labor/old/schedule  劳动力排班
 //POST /labor/schedule  智能排班调度
 //POST /equipment/list  农机具台账管理
 //POST /equipment/create  新增设备
@@ -69,6 +71,9 @@ public class Controller {
 
     @Resource
     private LaborService laborService;
+
+    @Resource
+    private EquipmentService equipmentService;
 
     @Operation(summary = "用户登录")
     @PostMapping("/auth/login")
@@ -193,6 +198,49 @@ public class Controller {
         int page = request != null && request.getPage() != null ? Math.max(1, request.getPage()) : 1;
         int size = request != null && request.getPageSize() != null ? Math.max(1, request.getPageSize()) : 20;
         return laborService.laborList(page, size);
+    }
+
+    @Operation(summary = "劳动力排班")
+    @PostMapping("/labor/old/schedule")
+    public Result<?> laborOldSchedule(@RequestBody Map<String, Object> request) {
+        return laborService.laborOldSchedule(request);
+    }
+
+    @Operation(summary = "智能排班调度")
+    @PostMapping("/labor/schedule")
+    public Result<?> laborSchedule(@RequestBody Map<String, Object> request) {
+        return laborService.laborSchedule(request);
+    }
+
+    @Operation(summary = "新增劳动力")
+    @PostMapping("/labor/create")
+    public Result<?> laborCreate(@RequestBody Map<String, Object> request) {
+        return laborService.laborCreate(request);
+    }
+
+    @Operation(summary = "农机具台账")
+    @PostMapping("/equipment/list")
+    public Result<?> equipmentList(@RequestBody(required = false) FarmlandListRequest request) {
+        int page = request != null && request.getPage() != null ? Math.max(1, request.getPage()) : 1;
+        int size = request != null && request.getPageSize() != null ? Math.max(1, request.getPageSize()) : 20;
+        return equipmentService.equipmentList(page, size);
+    }
+
+    @Operation(summary = "新增设备")
+    @PostMapping("/equipment/create")
+    public Result<?> equipmentCreate(@RequestBody Map<String, Object> request) {
+        return equipmentService.equipmentCreate(request);
+    }
+    @Operation(summary = "设备调配")
+    @PostMapping("/equipment/allocation")
+    public Result<?> equipmentAllocation(@RequestBody Map<String, Object> request) {
+        return equipmentService.equipmentAllocation(request);
+    }
+
+    @Operation(summary = "维护保养管理")
+    @PostMapping("/equipment/maintenance")
+    public Result<?> equipmentMaintenance() {
+        return equipmentService.equipmentMaintenance();
     }
 
 }
