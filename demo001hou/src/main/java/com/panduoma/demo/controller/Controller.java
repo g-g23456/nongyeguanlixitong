@@ -7,6 +7,8 @@ import com.panduoma.demo.entity.LoginDTO;
 import com.panduoma.demo.entity.User;
 import com.panduoma.demo.response.Result;
 import com.panduoma.demo.service.FarmlandService;
+import com.panduoma.demo.service.LaborService;
+import com.panduoma.demo.service.SeedService;
 import com.panduoma.demo.service.UserService;
 import com.panduoma.demo.service.WaterService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,7 +30,7 @@ import java.util.Map;
 
 //POST /water/status
 //POST /water/quota     水位配额
-//POST /water/create    配置调整
+//POST /water/quota/update    配置调整
 //POST /water/allocation    ai水位分配
 //POST /water/analysis    水位分析
 //POST /seed/inventory    种子库存
@@ -61,6 +63,12 @@ public class Controller {
 
     @Resource
     private WaterService waterService;
+
+    @Resource
+    private SeedService seedService;
+
+    @Resource
+    private LaborService laborService;
 
     @Operation(summary = "用户登录")
     @PostMapping("/auth/login")
@@ -132,14 +140,59 @@ public class Controller {
         return waterService.waterQuota(page, size);
     }
 
-    @Operation(summary = "当前水分配")
+    @Operation(summary = "传统水位管理")
     @PostMapping("/water/status")
     public Result<?> waterStatus() {
         return waterService.waterStatus();
     }
-    @Operation(summary = "AI 水位分配")
+    @Operation(summary = "AI 水位管理结果")
     @PostMapping("/water/allocation")
     public Result<?> waterAllocation(@RequestBody Map<String, Object> request) {
         return waterService.waterAllocation(request);
     }
+    @Operation(summary = "水位分析")
+    @PostMapping("/water/analysis")
+    public Result<?> waterAnalysis(@RequestBody Map<String, Object> request) {
+        int year = request != null && request.get("year") != null ? ((Number) request.get("year")).intValue() : 0;
+        return waterService.waterAnalysis(year);
+    }
+
+    @Operation(summary = "水位配额配置调整")
+    @PostMapping("/water/quota/update")
+    public Result<?> waterQuotaUpdate(@RequestBody Map<String, Object> request) {
+        return waterService.waterQuotaUpdate(request);
+    }
+    @Operation(summary = "农资库存")
+    @PostMapping("/seed/inventory")
+    public Result<?> seedInventory(@RequestBody(required = false) FarmlandListRequest request) {
+        int page = request != null && request.getPage() != null ? Math.max(1, request.getPage()) : 1;
+        int size = request != null && request.getPageSize() != null ? Math.max(1, request.getPageSize()) : 20;
+        return seedService.seedInventory(page, size);
+    }
+
+    @Operation(summary = "入库登记")
+    @PostMapping("/seed/create")
+    public Result<?> seedCreate(@RequestBody Map<String, Object> request) {
+        return seedService.seedCreate(request);
+    }
+
+    @Operation(summary = "AI 需求分配")
+    @PostMapping("/seed/allocation")
+    public Result<?> seedAllocation(@RequestBody Map<String, Object> request) {
+        return seedService.seedAllocation(request);
+    }
+
+    @Operation(summary = "消耗预测与库存预警")
+    @PostMapping("/seed/predict")
+    public Result<?> seedPredict() {
+        return seedService.seedPredict();
+    }
+    @Operation(summary = "劳动力列表")
+    @PostMapping("/labor/list")
+    public Result<?> laborList(@RequestBody(required = false) FarmlandListRequest request) {
+        int page = request != null && request.getPage() != null ? Math.max(1, request.getPage()) : 1;
+        int size = request != null && request.getPageSize() != null ? Math.max(1, request.getPageSize()) : 20;
+        return laborService.laborList(page, size);
+    }
+
 }

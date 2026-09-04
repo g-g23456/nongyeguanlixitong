@@ -49,11 +49,16 @@ export const waterApi = {
   analysis(payload = {}) {
     return postAction('/water/analysis', payload)
   },
+  updateQuota(payload = {}) {
+    return postAction('/water/quota/update', payload)
+  },
 }
-
 export const seedApi = {
   inventory(payload = {}) {
     return postAction('/seed/inventory', payload)
+  },
+  create(payload) {
+    return postAction('/seed/create', payload)
   },
   allocation(payload = {}) {
     return postAction('/seed/allocation', payload)

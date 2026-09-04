@@ -1,6 +1,3 @@
-
-create database 'user_role_data'
-
 CREATE TABLE IF NOT EXISTS `user_data` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `username` VARCHAR(128) NOT NULL,
@@ -78,7 +75,7 @@ CREATE TABLE IF NOT EXISTS `farmland_blocks` (
 CREATE TABLE IF NOT EXISTS `farmland_rotation` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `block_id` BIGINT UNSIGNED NOT NULL COMMENT 'farmland_blocks.id',
-  `year` INT NOT NULL,
+  `month` DATE DEFAULT NULL COMMENT '统计月份',
   `plan` JSON DEFAULT NULL COMMENT '轮作/休耕计划 JSON',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -90,7 +87,6 @@ CREATE TABLE IF NOT EXISTS `farmland_optimize_results` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `task_id` VARCHAR(64) DEFAULT NULL COMMENT '异步任务 id',
   `request_payload` JSON DEFAULT NULL,
-  `result` JSON DEFAULT NULL,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_farmland_optimize_task` (`task_id`)
@@ -99,6 +95,10 @@ CREATE TABLE IF NOT EXISTS `farmland_optimize_results` (
 -- 12. water_quota
 CREATE TABLE IF NOT EXISTS `water_quota` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `total_quota` DECIMAL(14,2) NOT NULL DEFAULT 0.00 COMMENT '总额',
+  `used_quota` DECIMAL(14,2) NOT NULL DEFAULT 0.00 COMMENT '使用额',
+  `residue_quota` DECIMAL(14,2) NOT NULL DEFAULT 0.00 COMMENT '剩余额',
+  `all_usage_rate` DECIMAL(14,2) NOT NULL DEFAULT 0.00 COMMENT '使用率',
   `region_id` BIGINT UNSIGNED DEFAULT NULL COMMENT 'regions.id' COMMENT '片区id',
   `period` VARCHAR(32) DEFAULT NULL COMMENT '例如 2024 或 2024-Q1',
   `quota` DECIMAL(14,2) DEFAULT 0 COMMENT '配额（单位需约定）',
@@ -115,27 +115,52 @@ CREATE TABLE IF NOT EXISTS `water_quota` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用水配额表';
 
 -- 13. water_allocation_results
-CREATE TABLE IF NOT EXISTS `water_allocation_results` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `task_id` VARCHAR(64) DEFAULT NULL,
-  `request` JSON DEFAULT NULL COMMENT '请求体',
-  `allocation` JSON DEFAULT NULL COMMENT '结果',
-  `saved_rate` DECIMAL(6,4) DEFAULT NULL COMMENT '节水率',
-  `yield_increase` DECIMAL(6,4) DEFAULT NULL COMMENT '作物增长率',
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE IF NOT EXISTS `water_allocation_analysis` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `alloc_period` VARCHAR(10) NOT NULL COMMENT '分配周期（格式：yyyy-Q1/yyyy-MM，如2026-Q2 季度分配）',
+  `region_id` BIGINT UNSIGNED NOT NULL COMMENT '片区ID',
+  `total_quota` DECIMAL(14,2) DEFAULT 0 COMMENT '该周期片区总用水配额（万m³）',
+  `theoretical_demand` DECIMAL(14,2) DEFAULT 0 COMMENT '理论需水量（万m³）',
+  `traditional_usage` DECIMAL(14,2) DEFAULT 0 COMMENT '传统方案用水量（万m³），对应页面传统方案柱状图',
+  `water_saving_rate` DECIMAL(6,4) DEFAULT 0 COMMENT '节水率（0-1，如0.1500代表15%节水率）',
+  `yield_increase_rate` DECIMAL(6,4) DEFAULT 0 COMMENT '作物增产率（0-1）',
+  `unit` VARCHAR(16) DEFAULT '万m³' COMMENT '计量单位',
+  `water_saving_irrigation` DECIMAL(5,2) DEFAULT 0 COMMENT '雷达图-节水灌溉评分（0-100分）',
+  `sustainability` DECIMAL(5,2) DEFAULT 0 COMMENT '雷达图-可持续性评分（0-100分）',
+  `utilization_rate` DECIMAL(5,2) DEFAULT 0 COMMENT '雷达图-利用率评分（0-100分）',
+  `balance` DECIMAL(5,2) DEFAULT 0 COMMENT '雷达图-均衡性评分（0-100分）',
+  `yield_guarantee` DECIMAL(5,2) DEFAULT 0 COMMENT '雷达图-产量保障评分（0-100分）',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_water_allocation_task` (`task_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='水资源 AI 分配结果';
+  UNIQUE KEY `uk_region` (`region_id`),
+  KEY `idx_alloc_period` (`alloc_period`),
+  KEY `idx_region_name` (`region_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='水资源传统分配与分析单表';
+
+CREATE TABLE IF NOT EXISTS `water_ai_analysis`(
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `task_id` BIGINT NOT NULL COMMENT 'ai任务id',
+  `region_id` BIGINT UNSIGNED NOT NULL COMMENT '片区ID',
+  `request` JSON DEFAULT NULL,
+  `result` JSON DEFAULT NULL,
+  `water_saving_irrigation` DECIMAL(5,2) DEFAULT 0 COMMENT '雷达图-节水灌溉评分（0-100分）',
+  `sustainability` DECIMAL(5,2) DEFAULT 0 COMMENT '雷达图-可持续性评分（0-100分）',
+  `utilization_rate` DECIMAL(5,2) DEFAULT 0 COMMENT '雷达图-利用率评分（0-100分）',
+  `balance` DECIMAL(5,2) DEFAULT 0 COMMENT '雷达图-均衡性评分（0-100分）',
+  `yield_guarantee` DECIMAL(5,2) DEFAULT 0 COMMENT '雷达图-产量保障评分（0-100分）',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_task_region` (`region_id`,`task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='水资源ai分配与分析单表';
+
 
 -- 14. water_analysis
 CREATE TABLE IF NOT EXISTS `water_analysis` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `region_id` BIGINT UNSIGNED DEFAULT NULL,
-  `start_date` DATE DEFAULT NULL,
-  `end_date` DATE DEFAULT NULL,
-  `analysis_result` JSON DEFAULT NULL,
-  `evaluation_score` INT DEFAULT NULL,
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `region_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '片区id',
+  `year` INT DEFAULT NULL COMMENT '统计年份',
+  `analysis_result` JSON DEFAULT NULL COMMENT 'ai结果，包含：实际用水	理论需求	浪费量	浪费率	AI建议	节水潜力',
   PRIMARY KEY (`id`),
   KEY `idx_water_analysis_region` (`region_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用水数据分析结果';
@@ -144,11 +169,11 @@ CREATE TABLE IF NOT EXISTS `water_analysis` (
 CREATE TABLE IF NOT EXISTS `seed_inventory` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `sku` VARCHAR(64) DEFAULT NULL COMMENT '产品编码',
-  `product_name` VARCHAR(128) DEFAULT NULL,
-  `category` VARCHAR(64) DEFAULT NULL,
-  `inventory` DECIMAL(14,2) DEFAULT 0,
-  `safety_threshold` DECIMAL(14,2) DEFAULT 0,
-  `status` VARCHAR(32) DEFAULT NULL,
+  `product_name` VARCHAR(128) DEFAULT NULL COMMENT '农资名字',
+  `category` VARCHAR(64) DEFAULT NULL COMMENT '分类',
+  `inventory` DECIMAL(14,2) DEFAULT 0 COMMENT '库存',
+  `safety_threshold` DECIMAL(14,2) DEFAULT 0 COMMENT '阈值',
+  `status` VARCHAR(32) DEFAULT NULL COMMENT '状态',
   `stat_month` DATE DEFAULT NULL COMMENT '统计月份（按月汇总，例如 2026-08-01）',
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -156,28 +181,13 @@ CREATE TABLE IF NOT EXISTS `seed_inventory` (
   KEY `idx_seed_inventory_stat_month` (`stat_month`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='农资库存台账';
 
--- 16. seed_movements
-CREATE TABLE IF NOT EXISTS `seed_movements` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `sku` VARCHAR(64) DEFAULT NULL,
-  `type` ENUM('IN','OUT') NOT NULL,
-  `quantity` DECIMAL(14,2) DEFAULT 0,
-  `source` VARCHAR(128) DEFAULT NULL,
-  `dest` VARCHAR(128) DEFAULT NULL,
-  `operator_id` BIGINT UNSIGNED DEFAULT NULL,
-  `remark` TEXT DEFAULT NULL,
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_seed_movements_sku` (`sku`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='农资出入库流水';
 
 -- 17. seed_allocation_results
 CREATE TABLE IF NOT EXISTS `seed_allocation_results` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `task_id` VARCHAR(64) DEFAULT NULL,
-  `request` JSON DEFAULT NULL,
-  `allocation` JSON DEFAULT NULL,
-  `metrics` JSON DEFAULT NULL,
+  `request` JSON DEFAULT NULL COMMENT '请求',
+  `result` JSON DEFAULT NULL COMMENT '结果',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_seed_allocation_task` (`task_id`)
@@ -185,69 +195,63 @@ CREATE TABLE IF NOT EXISTS `seed_allocation_results` (
 
 -- 18. seed_forecast
 CREATE TABLE IF NOT EXISTS `seed_forecast` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `product_name` VARCHAR(128) DEFAULT NULL,
-  `month` DATE DEFAULT NULL COMMENT '取 yyyy-mm-01 表示当月',
-  `expected_consumption` DECIMAL(14,2) DEFAULT NULL,
-  `confidence` DECIMAL(6,4) DEFAULT NULL,
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `product_code` VARCHAR(64) NOT NULL COMMENT '农资产品唯一编码（SKU）',
+  `stat_month` DATE NOT NULL COMMENT '统计/预测周期，格式yyyy-mm-01（支持月度/季度汇总）',
+  `history_consumption` DECIMAL(14,2) DEFAULT 0 COMMENT '该周期历史实际消耗数量（对应页面历史消耗折线）',
+  `expected_consumption` DECIMAL(14,2) DEFAULT 0 COMMENT 'AI模型预测消耗数量（对应页面AI预测折线）',
+  `confidence` DECIMAL(6,4) DEFAULT NULL COMMENT '预测置信度/准确率（0-1，如0.9500代表95%准确率）',
+  `current_inventory` DECIMAL(14,2) DEFAULT 0 COMMENT '当前库存数量（对应页面库存预警值）',
+  `safety_threshold` DECIMAL(14,2) DEFAULT 0 COMMENT '安全库存阈值（对应页面雷达图基准值）',
+  `gap_quantity` DECIMAL(14,2) DEFAULT 0 COMMENT '库存缺口数量（预测需求-当前库存）',
+  `alert_level` TINYINT DEFAULT 1 COMMENT '预警等级：1-正常，2-低于安全阈值，3-严重缺口',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
   PRIMARY KEY (`id`),
-  KEY `idx_seed_forecast_product_month` (`product_name`,`month`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='农资消耗预测';
+  UNIQUE KEY `uk_product_month` (`product_code`, `stat_month`),
+  KEY `idx_stat_month` (`stat_month`),
+  KEY `idx_alert_level` (`alert_level`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='农资消耗预测与库存预警表';
 
 -- 19. labor_workers
 CREATE TABLE IF NOT EXISTS `labor_workers` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `labor_code` VARCHAR(64) DEFAULT NULL,
-  `name` VARCHAR(64) DEFAULT NULL,
-  `skills` JSON DEFAULT NULL,
-  `region_id` BIGINT UNSIGNED DEFAULT NULL,
-  `availability` JSON DEFAULT NULL,
-  `status` VARCHAR(32) DEFAULT NULL,
-  `stat_month` DATE DEFAULT NULL COMMENT '统计月份（按月汇总，例如 2026-08-01）',
-  `contact` VARCHAR(64) DEFAULT NULL,
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_labor_workers_code` (`labor_code`),
-  KEY `idx_labor_workers_stat_month` (`stat_month`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='劳动力资源库';
+    labor_id VARCHAR(10) PRIMARY KEY COMMENT '劳动力编号，唯一主键',
+    labor_name VARCHAR(20) NOT NULL COMMENT '劳动力姓名',
+    work_type VARCHAR(50) NOT NULL COMMENT '工种',
+    skill_level VARCHAR(20) NOT NULL COMMENT '技能等级（高级/中级/初级）',
+    `region_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '片区id',
+    daily_salary DECIMAL(10,2) NOT NULL COMMENT '日薪（单位：元）',
+    available_time VARCHAR(20) NOT NULL COMMENT '可用时段（全天/白天/夜间）',
+    work_status VARCHAR(20) NOT NULL COMMENT '状态（在岗/请假/离职）',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) COMMENT = '农业劳动力资源信息库管理表';
 
 -- 20. labor_schedule
 CREATE TABLE IF NOT EXISTS `labor_schedule` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `task_id` VARCHAR(64) DEFAULT NULL,
-  `request` JSON DEFAULT NULL,
-  `schedule_plan` JSON DEFAULT NULL,
-  `match_rate` DECIMAL(6,4) DEFAULT NULL,
-  `gap_count` INT DEFAULT NULL,
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_labor_schedule_task` (`task_id`)
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    task_name VARCHAR(32) NOT NULL COMMENT '农时任务',
+    `region_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '片区id',
+    demand_num INT NOT NULL DEFAULT 0 COMMENT '需求人数',
+    supply_num INT NOT NULL DEFAULT 0 COMMENT '供给人数',
+    gap_num INT NOT NULL DEFAULT 0 COMMENT '缺口人数',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_task_name(task_name),
+    KEY idx_area(area)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能排班任务与结果';
-
--- 21. labor_assignments
-CREATE TABLE IF NOT EXISTS `labor_assignments` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `schedule_id` BIGINT UNSIGNED NOT NULL,
-  `labor_id` BIGINT UNSIGNED NOT NULL,
-  `date` DATE NOT NULL,
-  `hours` DECIMAL(5,2) DEFAULT 0,
-  PRIMARY KEY (`id`),
-  KEY `idx_labor_assignments_schedule` (`schedule_id`),
-  KEY `idx_labor_assignments_labor` (`labor_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='排班具体分配项';
 
 -- 22. equipment
 CREATE TABLE IF NOT EXISTS `equipment` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `equipment_code` VARCHAR(64) DEFAULT NULL,
-  `name` VARCHAR(128) DEFAULT NULL,
-  `type` VARCHAR(64) DEFAULT NULL,
-  `area` VARCHAR(64) DEFAULT NULL,
+  `equipment_code` VARCHAR(64) DEFAULT NULL COMMENT '设备编号',
+  `name` VARCHAR(128) DEFAULT NULL COMMENT '设备名称',
+  `type` VARCHAR(64) DEFAULT NULL COMMENT '类型',
+  `region_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '片区id',
   `efficiency` VARCHAR(64) DEFAULT NULL COMMENT '效率描述，如 15亩/h',
-  `status` VARCHAR(32) DEFAULT NULL,
+  `status` VARCHAR(32) DEFAULT NULL COMMENT '状态',
   `stat_month` DATE DEFAULT NULL COMMENT '统计月份（按月汇总，例如 2026-08-01）',
-  `score` INT DEFAULT NULL,
+  `score` INT DEFAULT NULL COMMENT '状态',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -257,17 +261,16 @@ CREATE TABLE IF NOT EXISTS `equipment` (
 
 -- 23. equipment_maintenance
 CREATE TABLE IF NOT EXISTS `equipment_maintenance` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `equipment_id` BIGINT UNSIGNED NOT NULL,
-  `last_maintenance` DATE DEFAULT NULL,
-  `next_maintenance` DATE DEFAULT NULL,
-  `status` VARCHAR(64) DEFAULT NULL,
-  `overdue_days` INT DEFAULT 0,
-  `cost` DECIMAL(12,2) DEFAULT 0,
-  `remark` TEXT DEFAULT NULL,
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_equipment_maintenance_eid` (`equipment_id`)
+    cost_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    stat_month VARCHAR(7) NOT NULL COMMENT '统计月份，格式：YYYY-MM（如2026-01）',
+    total_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '当月维护总成本（万元）',
+    plan_count INT NOT NULL DEFAULT 0 COMMENT '当月完成的维护计划数量',
+    manage_count INT NOT NULL DEFAULT 0 COMMENT '已经完成数量',
+    proceed_count INT NOT NULL DEFAULT 0 COMMENT '进行中的数量',
+    overdue_count INT NOT NULL DEFAULT 0 COMMENT '逾期的数量',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_stat_month (stat_month) COMMENT '月份唯一索引'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备维护保养记录';
 
 -- 24. equipment_allocation_results

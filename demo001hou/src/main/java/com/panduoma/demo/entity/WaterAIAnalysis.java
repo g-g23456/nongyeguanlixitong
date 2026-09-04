@@ -4,8 +4,6 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,36 +16,22 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@TableName("water_allocation_analysis")
-public class WaterAllocationAnalysis {
-
+@TableName("water_ai_analysis")
+public class WaterAIAnalysis {
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @TableField("alloc_period")
-    private String allocPeriod;
+    @TableField("task_id")
+    private Long taskId;
 
-    @JsonIgnore
     @TableField("region_id")
     private Long regionId;
 
-    @TableField("total_quota")
-    private BigDecimal totalQuota;
+    @TableField("request")
+    private String request;
 
-    @TableField("theoretical_demand")
-    private BigDecimal theoreticalDemand;
-
-    @TableField("traditional_usage")
-    private BigDecimal traditionalUsage;
-
-    @TableField("water_saving_rate")
-    private BigDecimal waterSavingRate;
-
-    @TableField("yield_increase_rate")
-    private BigDecimal yieldIncreaseRate;
-
-    @TableField("unit")
-    private String unit;
+    @TableField("result")
+    private String result;
 
     @TableField("water_saving_irrigation")
     private BigDecimal waterSavingIrrigation;
@@ -65,10 +49,8 @@ public class WaterAllocationAnalysis {
     private BigDecimal yieldGuarantee;
 
     @TableField("created_at")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
 
-    @TableField("updated_at")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime updatedAt;
+    @TableField(exist = false)
+    private String regionName;
 }

@@ -20,4 +20,19 @@ public interface WaterService {
      * AI 水位分配
      */
     Result<?> waterAllocation(Map<String, Object> request);
+
+    /**
+     * 水资源 AI 分析记录分页查询
+     */
+    Result<?> waterAIAnalysisList(int page, int size);
+
+    /**
+     * 用水数据分析
+     */
+    Result<?> waterAnalysis(int year);
+
+    /**
+     * 水位配额配置调整
+     */
+    Result<?> waterQuotaUpdate(Map<String, Object> request);
 }

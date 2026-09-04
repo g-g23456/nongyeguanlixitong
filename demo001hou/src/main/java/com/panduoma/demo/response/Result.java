@@ -38,6 +38,9 @@ public class Result<T> {
     public static <T> Result<T> data(T data){
         return new Result<>(ResponseCode.SUCCESS.getCode(), ResponseCode.SUCCESS.getMessage(), data);
     }
+    public static <T> Result<T> data(String message, T data){
+        return new Result<>(ResponseCode.SUCCESS.getCode(), message, data);
+    }
     public static <T> Result<T> error(String message){
         return new Result<>(ResponseCode.ERROR.getCode(), message);
     }
