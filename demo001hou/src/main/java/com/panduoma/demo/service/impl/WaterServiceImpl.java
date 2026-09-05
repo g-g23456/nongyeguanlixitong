@@ -7,10 +7,12 @@ import com.panduoma.demo.entity.Region;
 import com.panduoma.demo.entity.WaterAIAnalysis;
 import com.panduoma.demo.entity.WaterAnalysis;
 import com.panduoma.demo.entity.WaterQuota;
+import com.panduoma.demo.entity.WaterTotal;
 import com.panduoma.demo.mapper.RegionMapper;
 import com.panduoma.demo.mapper.WaterAIAnalysisMapper;
 import com.panduoma.demo.mapper.WaterAnalysisMapper;
 import com.panduoma.demo.mapper.WaterQuotaMapper;
+import com.panduoma.demo.mapper.WaterTotalMapper;
 import com.panduoma.demo.response.Result;
 import com.panduoma.demo.service.WaterService;
 import jakarta.annotation.Resource;
@@ -33,6 +35,9 @@ public class WaterServiceImpl implements WaterService {
 
     @Resource
     private WaterQuotaMapper waterQuotaMapper;
+
+    @Resource
+    private WaterTotalMapper waterTotalMapper;
 
     @Resource
     private WaterAIAnalysisMapper waterAIAnalysisMapper;
@@ -62,40 +67,46 @@ public class WaterServiceImpl implements WaterService {
                 .map(WaterQuota::getRegionId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+        Map<Long, String> regionNameMap = new HashMap<>();
         if (!regionIds.isEmpty()) {
             List<Region> regions = regionMapper.selectBatchIds(regionIds);
-            Map<Long, String> regionNameMap = regions.stream()
+            regionNameMap = regions.stream()
                     .collect(Collectors.toMap(Region::getId, Region::getName, (a, b) -> a));
-            for (WaterQuota record : records) {
-                if (record.getRegionId() != null) {
-                    record.setRegionName(regionNameMap.get(record.getRegionId()));
-                }
-            }
         }
 
-        // 计算汇总字段
-        BigDecimal totalQuota = BigDecimal.ZERO;
-        BigDecimal usedQuota = BigDecimal.ZERO;
-        BigDecimal residueQuota = BigDecimal.ZERO;
+        // 组装 items 列表
+        List<Map<String, Object>> items = new ArrayList<>();
         for (WaterQuota record : records) {
-            if (record.getTotalQuota() != null) totalQuota = totalQuota.add(record.getTotalQuota());
-            if (record.getUsedQuota() != null) usedQuota = usedQuota.add(record.getUsedQuota());
-            if (record.getResidueQuota() != null) residueQuota = residueQuota.add(record.getResidueQuota());
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("area", record.getRegionId() != null
+                    ? regionNameMap.getOrDefault(record.getRegionId(), "未知片区") : "未知片区");
+            item.put("quota", record.getQuota());
+            item.put("used", record.getUsed());
+            item.put("remaining", record.getRemain());
+            item.put("usageRate", record.getUsageRate());
+            item.put("cropType", null);
+            item.put("aiStatus", record.getAiEvaluate());
+            item.put("status", record.getStatus());
+            items.add(item);
         }
-        BigDecimal allUsageRate = totalQuota.compareTo(BigDecimal.ZERO) > 0
-                ? usedQuota.multiply(new BigDecimal("100")).divide(totalQuota, 2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
 
-        Map<String, Object> pageResult = new HashMap<>();
-        pageResult.put("current", resultPage.getCurrent());
-        pageResult.put("size", resultPage.getSize());
-        pageResult.put("total", resultPage.getTotal());
-        pageResult.put("totalQuota", totalQuota);
-        pageResult.put("usedQuota", usedQuota);
-        pageResult.put("residueQuota", residueQuota);
-        pageResult.put("allUsageRate", allUsageRate);
-        pageResult.put("records", records);
-        return Result.data(pageResult);
+        // 从 water_total 表读取汇总数据
+        WaterTotal waterTotal = waterTotalMapper.selectOne(new QueryWrapper<WaterTotal>().last("LIMIT 1"));
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        if (waterTotal != null) {
+            data.put("totalQuota", waterTotal.getTotalQuota());
+            data.put("allocated", waterTotal.getUsedQuota());
+            data.put("remaining", waterTotal.getResidueQuota());
+            data.put("usageRate", waterTotal.getAllUsageRate());
+        } else {
+            data.put("totalQuota", 0);
+            data.put("allocated", 0);
+            data.put("remaining", 0);
+            data.put("usageRate", 0);
+        }
+        data.put("items", items);
+        return Result.data(data);
     }
 
     @Override
@@ -120,8 +131,6 @@ public class WaterServiceImpl implements WaterService {
         List<Map<String, Object>> aiOptimized = new ArrayList<>();
         // currentEfficiency: 每条记录的使用率(usage_rate)
         List<BigDecimal> currentEfficiency = new ArrayList<>();
-        // aiEfficiency: 每条记录的综合使用率(all_usage_rate)
-        List<BigDecimal> aiEfficiency = new ArrayList<>();
 
         for (WaterQuota record : records) {
             String areaName = record.getRegionId() != null
@@ -139,7 +148,6 @@ public class WaterServiceImpl implements WaterService {
             aiOptimized.add(aiItem);
 
             currentEfficiency.add(record.getUsageRate() != null ? record.getUsageRate() : BigDecimal.ZERO);
-            aiEfficiency.add(record.getAllUsageRate() != null ? record.getAllUsageRate() : BigDecimal.ZERO);
         }
 
         // efficiency: 5 个指标评分 [节水灌溉, 产量保障, 均衡性, 利用率, 可持续性]
@@ -159,7 +167,6 @@ public class WaterServiceImpl implements WaterService {
         data.put("traditional", traditional);
         data.put("aiOptimized", aiOptimized);
         data.put("currentEfficiency", currentEfficiency);
-        data.put("aiEfficiency", aiEfficiency);
         data.put("efficiency", efficiency);
         return Result.data(data);
     }
@@ -578,18 +585,14 @@ public class WaterServiceImpl implements WaterService {
             }
 
             record.setQuota(newQuota);
-            // 重新计算残差配额
+            // 重新计算剩余配额
             if (record.getUsed() != null) {
                 record.setRemain(newQuota.subtract(record.getUsed()));
-            }
-            if (record.getTotalQuota() != null && record.getUsedQuota() != null) {
-                record.setResidueQuota(record.getTotalQuota().subtract(record.getUsedQuota()));
             }
             // 重新计算使用率
             if (newQuota.compareTo(BigDecimal.ZERO) > 0 && record.getUsed() != null) {
                 record.setUsageRate(record.getUsed()
-                        .multiply(new BigDecimal("100"))
-                        .divide(newQuota, 2, RoundingMode.HALF_UP));
+                        .divide(newQuota, 4, RoundingMode.HALF_UP));
             }
             waterQuotaMapper.updateById(record);
             updatedCount++;

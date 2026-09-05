@@ -90,6 +90,9 @@ export const equipmentApi = {
   create(payload) {
     return postAction('/equipment/create', payload)
   },
+  status(payload = {}) {
+    return postAction('/equipment/status', payload)
+  },
   allocation(payload = {}) {
     return postAction('/equipment/allocation', payload)
   },

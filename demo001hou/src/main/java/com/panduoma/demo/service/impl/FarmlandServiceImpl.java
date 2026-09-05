@@ -7,11 +7,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.panduoma.demo.entity.Famlandoptimize;
 import com.panduoma.demo.entity.FarmlandBlock;
 import com.panduoma.demo.entity.FarmlandOptimizeRequest;
+import com.panduoma.demo.entity.FarmlandTotal;
 import com.panduoma.demo.entity.Farmlandrotation;
 import com.panduoma.demo.entity.Region;
 import com.panduoma.demo.mapper.FarmlandBlockMapper;
 import com.panduoma.demo.mapper.FarmlandOptimizeResultMapper;
 import com.panduoma.demo.mapper.FarmlandRotationMapper;
+import com.panduoma.demo.mapper.FarmlandTotalMapper;
 import com.panduoma.demo.mapper.RegionMapper;
 import com.panduoma.demo.response.Result;
 import com.panduoma.demo.service.FarmlandService;
@@ -51,6 +53,9 @@ public class FarmlandServiceImpl implements FarmlandService {
     private RegionMapper regionMapper;
 
     @Resource
+    private FarmlandTotalMapper farmlandTotalMapper;
+
+    @Resource
     private ObjectMapper objectMapper;
 
     @Value("${deepseek.api-key:}")
@@ -69,23 +74,71 @@ public class FarmlandServiceImpl implements FarmlandService {
                 .map(FarmlandBlock::getRegionId)
                 .filter(Objects::nonNull)
                 .collect(java.util.stream.Collectors.toSet());
+        Map<Long, String> regionNameMap = new HashMap<>();
         if (!regionIds.isEmpty()) {
             List<Region> regions = regionMapper.selectBatchIds(regionIds);
-            Map<Long, String> regionNameMap = regions.stream()
+            regionNameMap = regions.stream()
                     .collect(java.util.stream.Collectors.toMap(Region::getId, Region::getName, (a, b) -> a));
-            for (FarmlandBlock record : records) {
-                if (record.getRegionId() != null) {
-                    record.setRegionName(regionNameMap.get(record.getRegionId()));
-                }
-            }
         }
 
-        Map<String, Object> pageResult = new HashMap<>();
-        pageResult.put("current", resultPage.getCurrent());
-        pageResult.put("size", resultPage.getSize());
-        pageResult.put("total", resultPage.getTotal());
-        pageResult.put("records", records);
-        return Result.data(pageResult);
+        // 组装 items 列表
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (FarmlandBlock record : records) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("blockCode", record.getBlockCode());
+            item.put("region", record.getRegionId() != null
+                    ? regionNameMap.getOrDefault(record.getRegionId(), "未知片区") : "未知片区");
+            item.put("area", record.getArea());
+            item.put("soilType", record.getSoilType());
+            // suitableCrops 从 JSON 字符串解析为数组
+            item.put("suitableCrops", parseSuitableCrops(record.getSuitableCrops()));
+            item.put("currentCrop", record.getCurrentCrop());
+            item.put("ownership", record.getOwnership());
+            item.put("plantingPeriod", record.getPlantingPeriod());
+            item.put("status", record.getStatus());
+            items.add(item);
+        }
+
+        // 从 farmland_total 表读取汇总数据
+        FarmlandTotal farmlandTotal = farmlandTotalMapper.selectOne(new QueryWrapper<FarmlandTotal>().last("LIMIT 1"));
+        Map<String, Object> stats = new LinkedHashMap<>();
+        if (farmlandTotal != null) {
+            stats.put("totalArea", farmlandTotal.getTotalQuota());
+            stats.put("plantedArea", farmlandTotal.getUsedQuota());
+            stats.put("pendingArea", farmlandTotal.getResidueQuota());
+            stats.put("fallowArea", farmlandTotal.getReusedQuota());
+        } else {
+            stats.put("totalArea", 0);
+            stats.put("plantedArea", 0);
+            stats.put("pendingArea", 0);
+            stats.put("fallowArea", 0);
+        }
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("total", resultPage.getTotal());
+        data.put("items", items);
+        data.put("stats", stats);
+        return Result.data(data);
+    }
+
+    /**
+     * 将 suitableCrops JSON 字符串解析为 List
+     */
+    private List<String> parseSuitableCrops(String suitableCrops) {
+        if (!StringUtils.hasText(suitableCrops)) {
+            return List.of();
+        }
+        try {
+            // 支持 JSON 数组格式，如 ["水稻","小麦","玉米"]
+            if (suitableCrops.trim().startsWith("[")) {
+                return objectMapper.readValue(suitableCrops, objectMapper.getTypeFactory()
+                        .constructCollectionType(List.class, String.class));
+            }
+            // 逗号分隔的纯文本格式
+            return List.of(suitableCrops.split("[,，]"));
+        } catch (Exception e) {
+            return List.of(suitableCrops);
+        }
     }
 
     @Override

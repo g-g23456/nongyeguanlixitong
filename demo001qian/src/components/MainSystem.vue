@@ -251,28 +251,28 @@
               <div class="dash-stat">
                 <div class="icon green">🌾</div>
                 <div>
-                  <h3>12,856 万亩</h3>
+                  <h3>{{ dashboardStats.farmland }}</h3>
                   <p>耕地总面积</p>
                 </div>
               </div>
               <div class="dash-stat">
                 <div class="icon blue">💧</div>
                 <div>
-                  <h3>2,450 万m³</h3>
+                  <h3>{{ dashboardStats.water }}</h3>
                   <p>年度用水配额</p>
                 </div>
               </div>
               <div class="dash-stat">
                 <div class="icon orange">🧪</div>
                 <div>
-                  <h3>8,650 万吨</h3>
+                  <h3>{{ dashboardStats.seed }}</h3>
                   <p>农资库存总量</p>
                 </div>
               </div>
               <div class="dash-stat">
                 <div class="icon purple">🚜</div>
                 <div>
-                  <h3>156 台</h3>
+                  <h3>{{ dashboardStats.equipment }}</h3>
                   <p>农机具总数</p>
                 </div>
               </div>
@@ -296,72 +296,20 @@
                 <div class="chart-title">⚠️ 资源调配异常预警</div>
                 <div style="padding: 12px">
                   <div
-                    style="
-                      display: flex;
-                      align-items: center;
-                      gap: 10px;
-                      padding: 10px;
-                      background: #fffbe6;
-                      border-radius: 6px;
-                      margin-bottom: 8px;
-                    "
+                    v-for="(alert, idx) in dashAlerts"
+                    :key="idx"
+                    :style="{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      marginBottom: '8px',
+                      background: alert.bg || '#fffbe6',
+                    }"
                   >
-                    <span>⚠️</span>
-                    <span style="font-size: 13px"
-                      >西片区用水配额使用率已达
-                      <strong style="color: #faad14">89.2%</strong>，建议启动节水方案</span
-                    >
-                  </div>
-                  <div
-                    style="
-                      display: flex;
-                      align-items: center;
-                      gap: 10px;
-                      padding: 10px;
-                      background: #fff1f0;
-                      border-radius: 6px;
-                      margin-bottom: 8px;
-                    "
-                  >
-                    <span>🔴</span>
-                    <span style="font-size: 13px"
-                      >南片区播种机C型
-                      <strong style="color: #f5222d">逾期维护12天</strong>，请尽快安排检修</span
-                    >
-                  </div>
-                  <div
-                    style="
-                      display: flex;
-                      align-items: center;
-                      gap: 10px;
-                      padding: 10px;
-                      background: #e6f7ff;
-                      border-radius: 6px;
-                      margin-bottom: 8px;
-                    "
-                  >
-                    <span>ℹ️</span>
-                    <span style="font-size: 13px"
-                      >化肥库存低于安全阈值，AI建议
-                      <strong style="color: #1890ff">补充600吨复合肥</strong></span
-                    >
-                  </div>
-                  <div
-                    style="
-                      display: flex;
-                      align-items: center;
-                      gap: 10px;
-                      padding: 10px;
-                      background: #f6ffed;
-                      border-radius: 6px;
-                    "
-                  >
-                    <span>✅</span>
-                    <span style="font-size: 13px"
-                      >东片区AI种植结构优化方案已执行，<strong style="color: #52c41a"
-                        >预计增产12.5%</strong
-                      ></span
-                    >
+                    <span>{{ alert.icon }}</span>
+                    <span style="font-size: 13px" v-html="alert.text"></span>
                   </div>
                 </div>
               </div>
@@ -1070,10 +1018,9 @@
                 <div class="form-group">
                   <label>目标作物</label>
                   <select v-model="seedAllocCrop">
-                    <option>全部作物</option>
-                    <option>水稻</option>
-                    <option>小麦</option>
-                    <option>玉米</option>
+                    <option v-for="crop in seedAllocCropOptions" :key="crop" :value="crop">
+                      {{ crop }}
+                    </option>
                   </select>
                 </div>
                 <div class="form-group">
@@ -1537,23 +1484,48 @@
             <div class="card">
               <div class="card-header">
                 <div class="card-title">🔩 农机具维护保养计划管理</div>
-                <button class="btn btn-primary">+ 新增维护计划</button>
               </div>
               <div class="stats-row">
                 <div class="stat-card info">
-                  <div class="stat-value">42</div>
+                  <div class="stat-value">
+                    {{
+                      (maintenanceData &&
+                        maintenanceData.stats &&
+                        maintenanceData.stats.monthlyPlan) ||
+                      42
+                    }}
+                  </div>
                   <div class="stat-label">本月计划</div>
                 </div>
                 <div class="stat-card success">
-                  <div class="stat-value">35</div>
+                  <div class="stat-value">
+                    {{
+                      (maintenanceData &&
+                        maintenanceData.stats &&
+                        maintenanceData.stats.completed) ||
+                      35
+                    }}
+                  </div>
                   <div class="stat-label">已完成</div>
                 </div>
                 <div class="stat-card warning">
-                  <div class="stat-value">5</div>
+                  <div class="stat-value">
+                    {{
+                      (maintenanceData &&
+                        maintenanceData.stats &&
+                        maintenanceData.stats.inProgress) ||
+                      5
+                    }}
+                  </div>
                   <div class="stat-label">进行中</div>
                 </div>
                 <div class="stat-card danger">
-                  <div class="stat-value">2</div>
+                  <div class="stat-value">
+                    {{
+                      (maintenanceData && maintenanceData.stats && maintenanceData.stats.overdue) ||
+                      2
+                    }}
+                  </div>
                   <div class="stat-label">逾期</div>
                 </div>
               </div>
@@ -1598,7 +1570,7 @@
                 <div class="form-row">
                   <div class="form-group">
                     <label>优化周期</label>
-                    <select>
+                    <select v-model="aiDecisionPeriod">
                       <option>2025年度</option>
                       <option>2025春季</option>
                       <option>2025秋季</option>
@@ -1606,7 +1578,7 @@
                   </div>
                   <div class="form-group">
                     <label>优化维度</label>
-                    <select>
+                    <select v-model="aiDecisionDimension">
                       <option>五维全优化</option>
                       <option>土地+产能</option>
                       <option>农资+人力</option>
@@ -1621,7 +1593,11 @@
               </div>
               <div v-if="aiDecisionResultVisible" id="aiDecisionResult">
                 <div class="ai-panel">
-                  <h4>�?AI综合决策方案已生成（多约束遗传算法· 500代迭代· 收敛中98.6%�?</h4>
+                  <h4>
+                    ✅ AI综合决策方案已生成（多约束遗传算法· 500代迭代· 收敛率{{
+                      (aiDecisionData && aiDecisionData.convergenceRate) || '98.6%'
+                    }}）
+                  </h4>
                   <div
                     style="
                       display: grid;
@@ -1638,7 +1614,9 @@
                         text-align: center;
                       "
                     >
-                      <div style="font-size: 20px; font-weight: 700; color: #52c41a">+12.5%</div>
+                      <div style="font-size: 20px; font-weight: 700; color: #52c41a">
+                        +{{ (aiDecisionData && aiDecisionData.yieldIncrease) || '12.5' }}%
+                      </div>
                       <div style="font-size: 12px; color: #999">预计增产</div>
                     </div>
                     <div
@@ -1649,7 +1627,9 @@
                         text-align: center;
                       "
                     >
-                      <div style="font-size: 20px; font-weight: 700; color: #1890ff">+8.3%</div>
+                      <div style="font-size: 20px; font-weight: 700; color: #1890ff">
+                        +{{ (aiDecisionData && aiDecisionData.waterSaving) || '8.3' }}%
+                      </div>
                       <div style="font-size: 12px; color: #999">节水提升</div>
                     </div>
                     <div
@@ -1660,7 +1640,9 @@
                         text-align: center;
                       "
                     >
-                      <div style="font-size: 20px; font-weight: 700; color: #fa8c16">+15.2%</div>
+                      <div style="font-size: 20px; font-weight: 700; color: #fa8c16">
+                        +{{ (aiDecisionData && aiDecisionData.efficiencyIncrease) || '15.2' }}%
+                      </div>
                       <div style="font-size: 12px; color: #999">增效提升</div>
                     </div>
                     <div
@@ -1671,7 +1653,9 @@
                         text-align: center;
                       "
                     >
-                      <div style="font-size: 20px; font-weight: 700; color: #722ed1">92%</div>
+                      <div style="font-size: 20px; font-weight: 700; color: #722ed1">
+                        {{ (aiDecisionData && aiDecisionData.resourceUtilization) || '92' }}%
+                      </div>
                       <div style="font-size: 12px; color: #999">资源利用率</div>
                     </div>
                   </div>
@@ -1702,7 +1686,42 @@
               </div>
               <div class="chart-row">
                 <div class="chart-box">
-                  <div class="chart-title">📊 历史产量与预测趋势</div>
+                  <div
+                    class="chart-title"
+                    style="display: flex; justify-content: space-between; align-items: center"
+                  >
+                    <span>📊 历史产量与预测趋势</span>
+                    <div style="display: flex; gap: 8px">
+                      <select
+                        v-model="yieldTrendArea"
+                        @change="onYieldFilterChange"
+                        style="
+                          padding: 2px 8px;
+                          border-radius: 4px;
+                          border: 1px solid #d9d9d9;
+                          font-size: 13px;
+                        "
+                      >
+                        <option v-for="area in yieldAreaOptions" :key="area" :value="area">
+                          {{ area }}
+                        </option>
+                      </select>
+                      <select
+                        v-model="yieldTrendYear"
+                        @change="onYieldFilterChange"
+                        style="
+                          padding: 2px 8px;
+                          border-radius: 4px;
+                          border: 1px solid #d9d9d9;
+                          font-size: 13px;
+                        "
+                      >
+                        <option v-for="year in yieldYearOptions" :key="year" :value="year">
+                          {{ year }}
+                        </option>
+                      </select>
+                    </div>
+                  </div>
                   <div ref="chartYieldTrend" style="height: 260px"></div>
                 </div>
                 <div class="chart-box">
@@ -1721,7 +1740,37 @@
             <div class="card">
               <div class="card-header">
                 <div class="card-title">📈 来年资源需求智能预测</div>
-                <span class="tag tag-info">多元回归 + 时间序列</span>
+                <div style="display: flex; gap: 8px; align-items: center">
+                  <select
+                    v-model="resourcePredictArea"
+                    @change="onResourceFilterChange"
+                    style="
+                      padding: 2px 8px;
+                      border-radius: 4px;
+                      border: 1px solid #d9d9d9;
+                      font-size: 13px;
+                    "
+                  >
+                    <option v-for="area in resourceAreaOptions" :key="area" :value="area">
+                      {{ area }}
+                    </option>
+                  </select>
+                  <select
+                    v-model="resourcePredictYear"
+                    @change="onResourceFilterChange"
+                    style="
+                      padding: 2px 8px;
+                      border-radius: 4px;
+                      border: 1px solid #d9d9d9;
+                      font-size: 13px;
+                    "
+                  >
+                    <option v-for="year in resourceYearOptions" :key="year" :value="year">
+                      {{ year }}
+                    </option>
+                  </select>
+                  <span class="tag tag-info">多元回归 + 时间序列</span>
+                </div>
               </div>
               <div class="chart-row">
                 <div class="chart-box">
@@ -1734,13 +1783,11 @@
                 </div>
               </div>
               <div class="ai-panel">
-                <h4>📋 AI资源需求预估报告（2025年度</h4>
+                <h4>📋 AI资源需求预估报告（{{ resourcePredictYear }}年度）</h4>
                 <p style="font-size: 13px; color: #555">
-                  基于2019-2024年历史数据训练的时间序列预测模型，预测025年农业资源总需求：用水
-                  <strong>2,580万m³</strong>（同期）5.3%），化肥
-                  <strong>2,650%</strong>（同期）8.1%），人力
-                  <strong>2.86万工时</strong
-                  >（同期）3.2%）。建议提前储备水资源配额、增加化肥采购预算。
+                  基于历史数据训练的时间序列预测模型，预测{{
+                    resourcePredictYear
+                  }}年农业资源总需求。
                 </p>
               </div>
             </div>
@@ -1839,6 +1886,8 @@ import {
   seedApi,
   laborApi,
   equipmentApi,
+  aiApi,
+  predictApi,
 } from '../api'
 
 export default {
@@ -1858,8 +1907,11 @@ export default {
       currentPage: 'dashboard',
       breadcrumb: '首页',
       subBreadcrumb: '数据驾驶舱',
+      dashboardData: null,
+      dashAlerts: [],
       showFarmlandCreateForm: false,
       farmlandList: [],
+      farmlandStatsData: null,
       farmlandTotal: 0,
       farmlandPage: 1,
       farmlandPageSize: 20,
@@ -2005,6 +2057,19 @@ export default {
       loadingDetail: '正在初始化..',
       aiOptimizeResultVisible: false,
       aiDecisionResultVisible: false,
+      aiDecisionData: null,
+      aiDecisionPeriod: '2025年度',
+      aiDecisionDimension: '五维全优化',
+      yieldTrendYear: '2025',
+      yieldTrendArea: '全部',
+      yieldData: null,
+      yieldAreaOptions: ['全部'],
+      yieldYearOptions: ['2025'],
+      resourcePredictYear: '2025',
+      resourcePredictArea: '全部',
+      resourcePredictData: null,
+      resourceAreaOptions: ['全部'],
+      resourceYearOptions: ['2025'],
       equipmentList: [],
       equipmentTotal: 0,
       equipmentPage: 1,
@@ -2013,6 +2078,7 @@ export default {
       equipmentAllocationTask: '耕地作业',
       equipmentAllocationArea: '多地块协同',
       equipmentAllocationResult: null,
+      maintenanceData: null,
       showEquipmentCreateForm: false,
       equipmentCreateForm: {
         id: '',
@@ -2069,9 +2135,6 @@ export default {
   },
   mounted() {
     this.loadDashboardData()
-    this.$nextTick(() => {
-      this.initDashboardCharts()
-    })
     window.addEventListener('resize', this.handleResize)
   },
   beforeDestroy() {
@@ -2111,8 +2174,35 @@ export default {
     seedInventoryTotalPages() {
       return Math.ceil(this.seedInventoryTotal / this.seedInventoryPageSize) || 1
     },
+    dashboardStats() {
+      if (this.dashboardData && this.dashboardData.stats) {
+        return this.dashboardData.stats
+      }
+      return {
+        farmland: '12,856 万亩',
+        water: '2,450 万m³',
+        seed: '8,650 万吨',
+        equipment: '156 台',
+      }
+    },
+    seedAllocCropOptions() {
+      const crops = new Set()
+      crops.add('全部作物')
+      ;(this.farmlandList || []).forEach((item) => {
+        if (item.currentCrop) crops.add(item.currentCrop)
+      })
+      if (crops.size === 1) {
+        crops.add('水稻')
+        crops.add('小麦')
+        crops.add('玉米')
+      }
+      return Array.from(crops)
+    },
     farmlandStats() {
       const list = this.farmlandList || []
+      if (this.farmlandStatsData) {
+        return this.farmlandStatsData
+      }
       const totalArea = list.reduce((sum, item) => sum + (item.area || 0), 0)
       const plantedArea = list
         .filter((item) => item.status === '种植中')
@@ -2316,11 +2406,40 @@ export default {
         const res = await dashboardApi.getOverview()
         const data = res?.data || res
         if (data) {
-          console.log('Dashboard overview loaded from backend:', data)
+          this.dashboardData = data
+          this.dashAlerts = data.alerts || data.warnings || []
         }
       } catch (error) {
         console.warn('Dashboard API unavailable, using local mock data:', error)
+        this.dashboardData = null
+        this.dashAlerts = this.getFallbackAlerts()
+      } finally {
+        this.$nextTick(() => this.initDashboardCharts())
       }
+    },
+    getFallbackAlerts() {
+      return [
+        {
+          icon: '⚠️',
+          bg: '#fffbe6',
+          text: '西片区用水配额使用率已达 <strong style="color:#faad14">89.2%</strong>，建议启动节水方案',
+        },
+        {
+          icon: '🔴',
+          bg: '#fff1f0',
+          text: '南片区播种机C型 <strong style="color:#f5222d">逾期维护12天</strong>，请尽快安排检修',
+        },
+        {
+          icon: 'ℹ️',
+          bg: '#e6f7ff',
+          text: '化肥库存低于安全阈值，AI建议 <strong style="color:#1890ff">补充600吨复合肥</strong>',
+        },
+        {
+          icon: '✅',
+          bg: '#f6ffed',
+          text: '东片区AI种植结构优化方案已执行，<strong style="color:#52c41a">预计增产12.5%</strong>',
+        },
+      ]
     },
     async loadFarmlandList() {
       this.farmlandLoading = true
@@ -2332,6 +2451,7 @@ export default {
         const data = res?.data || res
         this.farmlandTotal = data?.total || 0
         this.farmlandList = data?.items || []
+        this.farmlandStatsData = data?.stats || null
       } catch (error) {
         console.warn('Farmland list API unavailable:', error)
         this.farmlandList = []
@@ -2609,6 +2729,12 @@ export default {
         this.equipmentPage = 1
         this.loadEquipmentList()
       }
+      if (pageId === 'equipment-allocation') {
+        this.loadEquipmentStatus()
+      }
+      if (pageId === 'equipment-maintenance') {
+        this.loadMaintenanceData()
+      }
       if (pageId === 'water-quota') {
         this.loadWaterQuota()
       }
@@ -2851,6 +2977,33 @@ export default {
         alert('智能排班完成！\n\n整体匹配度 96.8%\n缺口: 15%')
       }
     },
+    async loadEquipmentStatus() {
+      this.showLoading('加载设备状态数据...', '正在获取设备调配信息...')
+      try {
+        const res = await equipmentApi.status({})
+        const data = res?.data || res
+        this.equipmentAllocationResult = data
+        this.hideLoading()
+        this.$nextTick(() => this.initEquipmentCharts())
+      } catch (error) {
+        console.warn('Equipment status API unavailable:', error)
+        this.equipmentAllocationResult = null
+        this.hideLoading()
+        this.$nextTick(() => this.initEquipmentCharts())
+      }
+    },
+    async loadMaintenanceData() {
+      try {
+        const res = await equipmentApi.maintenance({})
+        const data = res?.data || res
+        this.maintenanceData = data
+      } catch (error) {
+        console.warn('Maintenance API unavailable:', error)
+        this.maintenanceData = null
+      } finally {
+        this.$nextTick(() => this.initMaintenanceCharts())
+      }
+    },
     async runEquipmentAI() {
       this.showLoading('农机路径优化排程..', '最短路径算法计算中...')
       try {
@@ -2874,7 +3027,7 @@ export default {
     },
     runAIDecision() {
       this.showLoading('AI综合决策方案生成..', '五维数据融合与遗传算法运算中...')
-      let steps = [
+      const steps = [
         '读取五维历史数据...',
         '构建约束条件矩阵...',
         '遗传算法500代迭代..',
@@ -2886,18 +3039,33 @@ export default {
         if (i < steps.length) {
           this.loadingDetail = steps[i]
           i++
-        } else {
-          clearInterval(interval)
-          this.hideLoading()
-          this.aiDecisionResultVisible = true
-          this.$nextTick(() => this.initAIDecisionCharts())
         }
       }, 700)
+      aiApi
+        .decision({
+          period: this.aiDecisionPeriod,
+          dimension: this.aiDecisionDimension,
+        })
+        .then((res) => {
+          const data = res?.data || res
+          this.aiDecisionData = data
+          this.aiDecisionResultVisible = true
+        })
+        .catch((error) => {
+          console.warn('AI decision API unavailable:', error)
+          this.aiDecisionData = null
+          this.aiDecisionResultVisible = true
+        })
+        .finally(() => {
+          clearInterval(interval)
+          this.hideLoading()
+          this.$nextTick(() => this.initAIDecisionCharts())
+        })
     },
     initChartsForPage(pageId) {
       switch (pageId) {
         case 'dashboard':
-          this.initDashboardCharts()
+          this.loadDashboardData()
           break
         case 'farmland-optimize':
           this.initCropCharts()
@@ -2930,10 +3098,10 @@ export default {
           if (this.aiDecisionResultVisible) this.initAIDecisionCharts()
           break
         case 'predict-yield':
-          this.initYieldCharts()
+          this.loadYieldData()
           break
         case 'predict-resource':
-          this.initResourcePredictCharts()
+          this.loadResourcePredictData()
           break
       }
     },
@@ -2942,13 +3110,35 @@ export default {
       if (this.charts['dash2']) this.charts['dash2'].dispose()
       if (this.charts['dash3']) this.charts['dash3'].dispose()
       if (!this.$refs.chartDash1) return
+
+      const d = this.dashboardData
+      const months = (d && d.chart1 && d.chart1.xAxis) || ['1月', '2月', '3月', '4月', '5月', '6月']
+      const areas = (d && d.chart2 && d.chart2.xAxis) || ['东片区', '西片区', '南片区', '北片区']
+      const chart3XAxis = (d && d.chart3 && d.chart3.xAxis) || [
+        '1月',
+        '2月',
+        '3月',
+        '4月',
+        '5月',
+        '6月',
+        '7月',
+        '8月',
+        '9月',
+        '10月',
+        '11月',
+        '12月',
+      ]
+
       const c1 = echarts.init(this.$refs.chartDash1)
       c1.setOption({
         tooltip: { trigger: 'axis' },
-        legend: { data: ['耕地', '�?', '农资', '人力', '器械'], bottom: 0 },
-        xAxis: { type: 'category', data: ['1月', '2月', '3月', '4月', '5月', '6月'] },
+        legend: {
+          data: (d && d.chart1 && d.chart1.legend) || ['耕地', '用水', '农资', '人力', '器械'],
+          bottom: 0,
+        },
+        xAxis: { type: 'category', data: months },
         yAxis: { type: 'value' },
-        series: [
+        series: (d && d.chart1 && d.chart1.series) || [
           {
             name: '耕地',
             type: 'bar',
@@ -2956,7 +3146,7 @@ export default {
             itemStyle: { color: '#52c41a' },
           },
           {
-            name: '�?',
+            name: '用水',
             type: 'bar',
             data: [800, 850, 900, 950, 1000, 1050],
             itemStyle: { color: '#1890ff' },
@@ -2982,13 +3172,14 @@ export default {
         ],
       })
       this.charts['dash1'] = c1
+
       const c2 = echarts.init(this.$refs.chartDash2)
       c2.setOption({
         tooltip: { trigger: 'axis' },
         legend: { bottom: 0 },
-        xAxis: { type: 'category', data: ['东片区', '西片区', '南片区', '北片区'] },
+        xAxis: { type: 'category', data: areas },
         yAxis: { type: 'value' },
-        series: [
+        series: (d && d.chart2 && d.chart2.series) || [
           {
             name: '耕地(亩)',
             type: 'bar',
@@ -3005,38 +3196,47 @@ export default {
         ],
       })
       this.charts['dash2'] = c2
+
       const c3 = echarts.init(this.$refs.chartDash3)
       c3.setOption({
         tooltip: { trigger: 'axis' },
-        legend: { data: ['耕地利用率', '水资源利用率', '农资利用率', '人力利用率'], bottom: 0 },
-        xAxis: { type: 'category', data: ['2020', '2021', '2022', '2023', '2024'] },
+        legend: {
+          data: (d && d.chart3 && d.chart3.legend) || [
+            '耕地利用率',
+            '水资源利用率',
+            '农资利用率',
+            '人力利用率',
+          ],
+          bottom: 0,
+        },
+        xAxis: { type: 'category', data: chart3XAxis },
         yAxis: { type: 'value', max: 100 },
-        series: [
+        series: (d && d.chart3 && d.chart3.series) || [
           {
             name: '耕地利用率',
             type: 'line',
-            data: [72, 75, 78, 82, 86],
+            data: [72, 74, 76, 78, 80, 82, 84, 83, 81, 79, 77, 75],
             smooth: true,
             itemStyle: { color: '#52c41a' },
           },
           {
             name: '水资源利用率',
             type: 'line',
-            data: [65, 68, 72, 76, 80],
+            data: [65, 67, 69, 71, 73, 75, 77, 76, 74, 72, 70, 68],
             smooth: true,
             itemStyle: { color: '#1890ff' },
           },
           {
             name: '农资利用率',
             type: 'line',
-            data: [60, 64, 68, 73, 78],
+            data: [60, 62, 64, 66, 68, 70, 73, 72, 70, 67, 64, 62],
             smooth: true,
             itemStyle: { color: '#fa8c16' },
           },
           {
             name: '人力利用率',
             type: 'line',
-            data: [70, 73, 76, 79, 83],
+            data: [70, 72, 74, 76, 78, 80, 82, 81, 79, 77, 75, 73],
             smooth: true,
             itemStyle: { color: '#722ed1' },
           },
@@ -3562,6 +3762,16 @@ export default {
       if (this.charts['maint-health']) this.charts['maint-health'].dispose()
       if (this.charts['maint-cost']) this.charts['maint-cost'].dispose()
       if (!this.$refs.chartMaintHealth) return
+      const md = this.maintenanceData
+      const healthData = (md && md.healthStatus) || [
+        { value: 82, name: '健康', itemStyle: { color: '#52c41a' } },
+        { value: 12, name: '亚健康', itemStyle: { color: '#faad14' } },
+        { value: 6, name: '需维护', itemStyle: { color: '#f5222d' } },
+      ]
+      const costData = (md && md.costTrend) || {
+        months: ['1月', '2月', '3月', '4月', '5月', '6月'],
+        values: [3.2, 2.8, 4.5, 3.6, 5.2, 4.8],
+      }
       const c1 = echarts.init(this.$refs.chartMaintHealth)
       c1.setOption({
         tooltip: { trigger: 'item' },
@@ -3570,11 +3780,7 @@ export default {
           {
             type: 'pie',
             radius: '60%',
-            data: [
-              { value: 82, name: '健康', itemStyle: { color: '#52c41a' } },
-              { value: 12, name: '亚健康', itemStyle: { color: '#faad14' } },
-              { value: 6, name: '需维护', itemStyle: { color: '#f5222d' } },
-            ],
+            data: healthData,
           },
         ],
       })
@@ -3582,12 +3788,12 @@ export default {
       const c2 = echarts.init(this.$refs.chartMaintCost)
       c2.setOption({
         tooltip: { trigger: 'axis' },
-        xAxis: { type: 'category', data: ['1月', '2月', '3月', '4月', '5月', '6月'] },
+        xAxis: { type: 'category', data: costData.months },
         yAxis: { type: 'value', name: '万元' },
         series: [
           {
             type: 'line',
-            data: [3.2, 2.8, 4.5, 3.6, 5.2, 4.8],
+            data: costData.values,
             itemStyle: { color: '#1890ff' },
             smooth: true,
             areaStyle: { opacity: 0.2 },
@@ -3600,6 +3806,28 @@ export default {
       if (this.charts['ai-radar']) this.charts['ai-radar'].dispose()
       if (this.charts['ai-pie']) this.charts['ai-pie'].dispose()
       if (!this.$refs.chartAiRadar) return
+      const ad = this.aiDecisionData
+      const radarData = (ad && ad.radar) || [
+        {
+          value: [75, 60, 70, 65, 72, 68],
+          name: '人工调配',
+          itemStyle: { color: '#faad14' },
+          areaStyle: { opacity: 0.2 },
+        },
+        {
+          value: [92, 88, 85, 82, 90, 91],
+          name: 'AI优化',
+          itemStyle: { color: '#52c41a' },
+          areaStyle: { opacity: 0.3 },
+        },
+      ]
+      const pieData = (ad && ad.resourceAllocation) || [
+        { value: 32, name: '耕地优化', itemStyle: { color: '#52c41a' } },
+        { value: 25, name: '水资源', itemStyle: { color: '#1890ff' } },
+        { value: 20, name: '农资分配', itemStyle: { color: '#faad14' } },
+        { value: 15, name: '人力调度', itemStyle: { color: '#722ed1' } },
+        { value: 8, name: '器械调配', itemStyle: { color: '#eb2f96' } },
+      ]
       const c1 = echarts.init(this.$refs.chartAiRadar)
       c1.setOption({
         tooltip: {},
@@ -3618,20 +3846,7 @@ export default {
         series: [
           {
             type: 'radar',
-            data: [
-              {
-                value: [75, 60, 70, 65, 72, 68],
-                name: '人工调配',
-                itemStyle: { color: '#faad14' },
-                areaStyle: { opacity: 0.2 },
-              },
-              {
-                value: [92, 88, 85, 82, 90, 91],
-                name: 'AI优化',
-                itemStyle: { color: '#52c41a' },
-                areaStyle: { opacity: 0.3 },
-              },
-            ],
+            data: radarData,
           },
         ],
       })
@@ -3645,47 +3860,117 @@ export default {
             type: 'pie',
             radius: ['35%', '65%'],
             roseType: 'radius',
-            data: [
-              { value: 32, name: '耕地优化', itemStyle: { color: '#52c41a' } },
-              { value: 25, name: '水资源', itemStyle: { color: '#1890ff' } },
-              { value: 20, name: '农资分配', itemStyle: { color: '#faad14' } },
-              { value: 15, name: '人力调度', itemStyle: { color: '#722ed1' } },
-              { value: 8, name: '器械调配', itemStyle: { color: '#eb2f96' } },
-            ],
+            data: pieData,
           },
         ],
       })
       this.charts['ai-pie'] = c2
     },
+    async loadYieldData() {
+      try {
+        const res = await predictApi.yield({ year: this.yieldTrendYear, area: this.yieldTrendArea })
+        const data = res?.data || res
+        this.yieldData = data
+        if (data && data.areaOptions && data.areaOptions.length) {
+          this.yieldAreaOptions = data.areaOptions
+        }
+        if (data && data.yearOptions && data.yearOptions.length) {
+          this.yieldYearOptions = data.yearOptions
+        }
+      } catch (error) {
+        console.warn('Yield predict API unavailable:', error)
+        this.yieldData = null
+        this.yieldAreaOptions = ['全部', '北区', '南区', '东区', '西区']
+        this.yieldYearOptions = ['2020', '2021', '2022', '2023', '2024', '2025']
+      } finally {
+        this.$nextTick(() => this.initYieldCharts())
+      }
+    },
+    getYieldTrendData(year) {
+      const months = [
+        '1月',
+        '2月',
+        '3月',
+        '4月',
+        '5月',
+        '6月',
+        '7月',
+        '8月',
+        '9月',
+        '10月',
+        '11月',
+        '12月',
+      ]
+      if (this.yieldData && this.yieldData.trend) {
+        return { months: this.yieldData.trend.months || months, data: this.yieldData.trend }
+      }
+      const base = {
+        2020: {
+          rice: [3100, 3120, 3150, 3180, 3200, 3220, 3250, 3280, 3300, 3320, 3350, 3200],
+          wheat: [2000, 2020, 2050, 2080, 2100, 2120, 2150, 2180, 2200, 2220, 2250, 2100],
+          corn: [2700, 2720, 2750, 2780, 2800, 2820, 2850, 2880, 2900, 2920, 2950, 2800],
+        },
+        2021: {
+          rice: [3250, 3280, 3300, 3320, 3350, 3380, 3400, 3420, 3450, 3480, 3500, 3350],
+          wheat: [2080, 2100, 2120, 2150, 2180, 2200, 2220, 2250, 2280, 2300, 2320, 2180],
+          corn: [2820, 2850, 2880, 2900, 2920, 2950, 2980, 3000, 3020, 3050, 3080, 2920],
+        },
+        2022: {
+          rice: [3350, 3380, 3400, 3420, 3450, 3480, 3500, 3520, 3550, 3580, 3600, 3450],
+          wheat: [2150, 2180, 2200, 2220, 2250, 2280, 2300, 2320, 2350, 2380, 2400, 2250],
+          corn: [2950, 2980, 3000, 3020, 3050, 3080, 3100, 3120, 3150, 3180, 3200, 3050],
+        },
+        2023: {
+          rice: [3480, 3500, 3520, 3550, 3580, 3600, 3620, 3650, 3680, 3700, 3720, 3580],
+          wheat: [2220, 2250, 2280, 2300, 2320, 2350, 2380, 2400, 2420, 2450, 2480, 2320],
+          corn: [3080, 3100, 3120, 3150, 3180, 3200, 3220, 3250, 3280, 3300, 3320, 3180],
+        },
+        2024: {
+          rice: [3580, 3600, 3620, 3650, 3680, 3700, 3720, 3750, 3780, 3800, 3820, 3680],
+          wheat: [2280, 2300, 2320, 2350, 2380, 2400, 2420, 2450, 2480, 2500, 2520, 2380],
+          corn: [3180, 3200, 3220, 3250, 3280, 3300, 3320, 3350, 3380, 3400, 3420, 3280],
+        },
+        2025: {
+          rice: [3680, 3700, 3720, 3750, 3780, 3800, 3820, 3850, 3880, 3900, 3920, 3850],
+          wheat: [2380, 2400, 2420, 2450, 2480, 2500, 2520, 2550, 2580, 2600, 2620, 2480],
+          corn: [3280, 3300, 3320, 3350, 3380, 3400, 3420, 3450, 3480, 3500, 3520, 3400],
+        },
+      }
+      return { months, data: base[year] || base['2025'] }
+    },
+    onYieldFilterChange() {
+      this.loadYieldData()
+    },
     initYieldCharts() {
       if (this.charts['yield-trend']) this.charts['yield-trend'].dispose()
       if (this.charts['yield-pie']) this.charts['yield-pie'].dispose()
       if (!this.$refs.chartYieldTrend) return
+      const { months, data } = this.getYieldTrendData(this.yieldTrendYear)
       const c1 = echarts.init(this.$refs.chartYieldTrend)
       c1.setOption({
         tooltip: { trigger: 'axis' },
         legend: { data: ['水稻', '小麦', '玉米'], bottom: 0 },
-        xAxis: { type: 'category', data: ['2020', '2021', '2022', '2023', '2024', '2025E'] },
+        xAxis: { type: 'category', data: months },
         yAxis: { type: 'value', name: '产量(吨/亩)' },
         series: [
           {
             name: '水稻',
             type: 'line',
-            data: [3200, 3350, 3450, 3580, 3680, 3850],
+            data: data.rice,
             smooth: true,
             itemStyle: { color: '#52c41a' },
           },
           {
             name: '小麦',
             type: 'line',
-            data: [2100, 2180, 2250, 2320, 2380, 2480],
+            data: data.wheat,
             smooth: true,
             itemStyle: { color: '#faad14' },
           },
           {
             name: '玉米',
             type: 'line',
-            data: [2800, 2920, 3050, 3180, 3280, 3400],
+            data: data.corn,
             smooth: true,
             itemStyle: { color: '#1890ff' },
           },
@@ -3693,6 +3978,11 @@ export default {
       })
       this.charts['yield-trend'] = c1
       const c2 = echarts.init(this.$refs.chartYieldPie)
+      const pieData = (this.yieldData && this.yieldData.pie) || [
+        { value: 3850, name: '水稻 42%', itemStyle: { color: '#52c41a' } },
+        { value: 2480, name: '小麦 27%', itemStyle: { color: '#faad14' } },
+        { value: 3400, name: '玉米 31%', itemStyle: { color: '#1890ff' } },
+      ]
       c2.setOption({
         tooltip: { trigger: 'item' },
         legend: { bottom: 0 },
@@ -3700,31 +3990,90 @@ export default {
           {
             type: 'pie',
             radius: '60%',
-            data: [
-              { value: 3850, name: '水稻 42%', itemStyle: { color: '#52c41a' } },
-              { value: 2480, name: '小麦 27%', itemStyle: { color: '#faad14' } },
-              { value: 3400, name: '玉米 31%', itemStyle: { color: '#1890ff' } },
-            ],
+            data: pieData,
           },
         ],
       })
       this.charts['yield-pie'] = c2
     },
+    async loadResourcePredictData() {
+      try {
+        const res = await predictApi.resource({
+          year: this.resourcePredictYear,
+          area: this.resourcePredictArea,
+        })
+        const data = res?.data || res
+        this.resourcePredictData = data
+        if (data && data.areaOptions && data.areaOptions.length) {
+          this.resourceAreaOptions = data.areaOptions
+        }
+        if (data && data.yearOptions && data.yearOptions.length) {
+          this.resourceYearOptions = data.yearOptions
+        }
+      } catch (error) {
+        console.warn('Resource predict API unavailable:', error)
+        this.resourcePredictData = null
+        this.resourceAreaOptions = ['全部', '北区', '南区', '东区', '西区']
+        this.resourceYearOptions = ['2020', '2021', '2022', '2023', '2024', '2025']
+      } finally {
+        this.$nextTick(() => this.initResourcePredictCharts())
+      }
+    },
+    onResourceFilterChange() {
+      this.loadResourcePredictData()
+    },
+    getResourcePredictData() {
+      const months = [
+        '1月',
+        '2月',
+        '3月',
+        '4月',
+        '5月',
+        '6月',
+        '7月',
+        '8月',
+        '9月',
+        '10月',
+        '11月',
+        '12月',
+      ]
+      if (this.resourcePredictData) {
+        return {
+          months: this.resourcePredictData.months || months,
+          water: this.resourcePredictData.water,
+          seed: this.resourcePredictData.seed,
+        }
+      }
+      const fallback = {
+        months,
+        water: {
+          agriculture: [180, 195, 220, 250, 280, 310, 350, 340, 300, 260, 220, 190],
+          ecology: [25, 27, 30, 32, 35, 38, 42, 40, 36, 32, 28, 26],
+        },
+        seed: {
+          fertilizer: [160, 175, 195, 215, 240, 265, 285, 275, 240, 210, 185, 170],
+          pesticide: [4.5, 4.8, 5.2, 5.6, 6.0, 6.5, 7.0, 6.8, 5.8, 5.2, 4.6, 4.2],
+          seed: [24, 26, 28, 30, 32, 34, 36, 35, 31, 28, 26, 24],
+        },
+      }
+      return fallback
+    },
     initResourcePredictCharts() {
       if (this.charts['predict-water']) this.charts['predict-water'].dispose()
       if (this.charts['predict-seed']) this.charts['predict-seed'].dispose()
       if (!this.$refs.chartPredictWater) return
+      const { months, water, seed } = this.getResourcePredictData()
       const c1 = echarts.init(this.$refs.chartPredictWater)
       c1.setOption({
         tooltip: { trigger: 'axis' },
         legend: { data: ['农业用水', '生态用水'], bottom: 0 },
-        xAxis: { type: 'category', data: ['2024', '2025E', '2026E', '2027E'] },
+        xAxis: { type: 'category', data: months },
         yAxis: { type: 'value', name: '万m³' },
         series: [
           {
             name: '农业用水',
             type: 'line',
-            data: [2450, 2580, 2650, 2720],
+            data: water.agriculture,
             smooth: true,
             areaStyle: { opacity: 0.2 },
             itemStyle: { color: '#52c41a' },
@@ -3732,7 +4081,7 @@ export default {
           {
             name: '生态用水',
             type: 'line',
-            data: [320, 350, 380, 410],
+            data: water.ecology,
             smooth: true,
             areaStyle: { opacity: 0.2 },
             itemStyle: { color: '#1890ff' },
@@ -3744,27 +4093,27 @@ export default {
       c2.setOption({
         tooltip: { trigger: 'axis' },
         legend: { data: ['化肥', '农药', '种子'], bottom: 0 },
-        xAxis: { type: 'category', data: ['2024', '2025E', '2026E', '2027E'] },
+        xAxis: { type: 'category', data: months },
         yAxis: { type: 'value', name: 'kg' },
         series: [
           {
             name: '化肥',
             type: 'bar',
-            data: [2180, 2350, 2480, 2600],
+            data: seed.fertilizer,
             itemStyle: { color: '#52c41a' },
             barWidth: 20,
           },
           {
             name: '农药',
             type: 'bar',
-            data: [64, 58, 52, 48],
+            data: seed.pesticide,
             itemStyle: { color: '#faad14' },
             barWidth: 20,
           },
           {
             name: '种子',
             type: 'bar',
-            data: [320, 340, 355, 370],
+            data: seed.seed,
             itemStyle: { color: '#1890ff' },
             barWidth: 20,
           },

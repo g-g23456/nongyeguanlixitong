@@ -6,6 +6,7 @@ import com.panduoma.demo.entity.FarmlandOptimizeRequest;
 import com.panduoma.demo.entity.LoginDTO;
 import com.panduoma.demo.entity.User;
 import com.panduoma.demo.response.Result;
+import com.panduoma.demo.service.DashboardService;
 import com.panduoma.demo.service.FarmlandService;
 import com.panduoma.demo.service.EquipmentService;
 import com.panduoma.demo.service.LaborService;
@@ -24,6 +25,7 @@ import java.util.Map;
 //POST /auth/me      获取当前用户信息
 //POST /auth/logout   登出
 //POST /dashboard/overview   获取看板数据
+
 //POST /farmland/list     获取所有农田
 //POST /farmland/create   创建农田
 //POST /farmland/optimize  ai优化农田布局
@@ -44,6 +46,7 @@ import java.util.Map;
 //POST /labor/schedule  智能排班调度
 //POST /equipment/list  农机具台账管理
 //POST /equipment/create  新增设备
+//POST /equipment/status  原始设备调配分布
 //POST /equipment/allocation   智能调配与路径优化
 //POST /equipment/maintenance    维护保养管理
 //POST /ai/decision    AI综合决策中心
@@ -74,6 +77,9 @@ public class Controller {
 
     @Resource
     private EquipmentService equipmentService;
+
+    @Resource
+    private DashboardService dashboardService;
 
     @Operation(summary = "用户登录")
     @PostMapping("/auth/login")
@@ -108,6 +114,12 @@ public class Controller {
             StpUtil.logout(user.getId());
         }
         return result;
+    }
+
+    @Operation(summary = "获取看板数据")
+    @PostMapping("/dashboard/overview")
+    public Result<?> dashboardOverview() {
+        return dashboardService.dashboardOverview();
     }
 
     @Operation(summary = "地块台账")
@@ -231,10 +243,16 @@ public class Controller {
     public Result<?> equipmentCreate(@RequestBody Map<String, Object> request) {
         return equipmentService.equipmentCreate(request);
     }
-    @Operation(summary = "设备调配")
+    @Operation(summary = "设备调配分布")
+    @PostMapping("/equipment/status")
+    public Result<?> equipmentStatus() {
+        return equipmentService.equipmentStatus();
+    }
+
+    @Operation(summary = "智能调配与路径优化")
     @PostMapping("/equipment/allocation")
-    public Result<?> equipmentAllocation(@RequestBody Map<String, Object> request) {
-        return equipmentService.equipmentAllocation(request);
+    public Result<?> machineryDispatchCreate(@RequestBody Map<String, Object> request) {
+        return equipmentService.machineryDispatchCreate(request);
     }
 
     @Operation(summary = "维护保养管理")
@@ -243,4 +261,21 @@ public class Controller {
         return equipmentService.equipmentMaintenance();
     }
 
+    @Operation(summary = "AI 决策")
+    @PostMapping("/ai/decision")
+    public Result<?> aiDecision(@RequestBody Map<String, Object> request) {
+        return equipmentService.aiDecision(request);
+    }
+
+    @Operation(summary = "作物产量预测")
+    @PostMapping("/predict/yield")
+    public Result<?> yieldPrediction(@RequestBody Map<String, Object> request) {
+        return equipmentService.yieldPrediction(request);
+    }
+
+    @Operation(summary = "资源需求智能预测")
+    @PostMapping("/predict/resource")
+    public Result<?> resourcePrediction(@RequestBody Map<String, Object> request) {
+        return equipmentService.resourcePrediction(request);
+    }
 }
