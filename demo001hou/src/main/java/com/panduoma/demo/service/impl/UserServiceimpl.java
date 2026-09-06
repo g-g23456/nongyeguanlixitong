@@ -6,17 +6,27 @@ import com.panduoma.demo.entity.LoginDTO;
 import com.panduoma.demo.entity.LoginLog;
 import com.panduoma.demo.entity.User;
 import com.panduoma.demo.mapper.LoginLogMapper;
+import com.panduoma.demo.mapper.PermissionMapper;
 import com.panduoma.demo.mapper.UserMapper;
 import com.panduoma.demo.response.Result;
 import com.panduoma.demo.service.UserService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 @Service
 public class UserServiceimpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     @Resource
     private LoginLogMapper loginLogMapper;
+
+    @Resource
+    private PermissionMapper permissionMapper;
+
     @Override
     public Result<?> updateUserStatus(Long userId, Integer status) {
 
@@ -116,5 +126,62 @@ public class UserServiceimpl extends ServiceImpl<UserMapper, User> implements Us
         baseMapper.updateById(user);
 
         return Result.success("退出登录成功");
+    }
+
+    @Override
+    public Result<?> systemUsers() {
+        // 1. 统计数据
+        long totalUsers = baseMapper.selectCount(null);
+        long totalPermissions = permissionMapper.selectCount(null);
+        long totalLogs = loginLogMapper.selectCount(null);
+
+        // 2. 查询所有用户，隐藏密码
+        List<User> users = baseMapper.selectList(null);
+        for (User user : users) {
+            user.setPassword(null);
+        }
+
+        // 3. 组装响应
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalUsers", totalUsers);
+        stats.put("totalRoles", 4);
+        stats.put("totalPermissions", totalPermissions);
+        stats.put("totalLogs", totalLogs);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("stats", stats);
+        data.put("list", users);
+
+        return Result.data(data);
+    }
+
+    @Override
+    public Result<?> systemUserCreate(Map<String, Object> request) {
+        if (request == null) {
+            return Result.error("参数不能为空");
+        }
+
+        String username = request.get("username") != null ? request.get("username").toString() : null;
+        String name = request.get("name") != null ? request.get("name").toString() : null;
+        String password = request.get("password") != null ? request.get("password").toString() : null;
+        String role = request.get("role") != null ? request.get("role").toString() : null;
+        String department = request.get("department") != null ? request.get("department").toString() : null;
+        Object statusObj = request.get("status");
+        String status = statusObj != null ? statusObj.toString() : "0";
+
+        if (username == null || username.isBlank() || password == null || password.isBlank()) {
+            return Result.error("用户名和密码不能为空");
+        }
+
+        User user = new User();
+        user.setUsername(username);
+        user.setName(name);
+        user.setPassword(password);
+        user.setRole(role);
+        user.setDepartment(department);
+        user.setStatus(status);
+
+        baseMapper.insert(user);
+        return Result.success("创建成功");
     }
 }

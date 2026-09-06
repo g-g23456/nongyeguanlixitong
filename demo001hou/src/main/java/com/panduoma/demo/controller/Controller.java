@@ -278,4 +278,16 @@ public class Controller {
     public Result<?> resourcePrediction(@RequestBody Map<String, Object> request) {
         return equipmentService.resourcePrediction(request);
     }
+
+    @Operation(summary = "用户列表")
+    @PostMapping("/system/users")
+    public Result<?> systemUsers() {
+        return userService.systemUsers();
+    }
+
+    @Operation(summary = "新增用户")
+    @PostMapping("/system/create")
+    public Result<?> systemUserCreate(@RequestBody Map<String, Object> request) {
+        return userService.systemUserCreate(request);
+    }
 }

@@ -328,7 +328,6 @@
                   <button class="btn btn-primary" @click="showFarmlandCreateForm = true">
                     + 新增地块
                   </button>
-                  <button class="btn btn-outline" style="margin-left: 8px">导出Excel</button>
                 </div>
               </div>
               <div v-if="showFarmlandCreateForm" class="card" style="margin-bottom: 16px">
@@ -637,7 +636,6 @@
                 <div class="card-title">💧 区域年度/季度用水配额数据管理</div>
                 <div>
                   <button class="btn btn-primary" @click="showQuotaAdjust">+ 配额调整</button>
-                  <button class="btn btn-outline" style="margin-left: 8px">导出报表</button>
                 </div>
               </div>
               <div class="stats-row">
@@ -852,7 +850,6 @@
                   <button class="btn btn-primary" @click="showSeedCreateForm = true">
                     + 入库登记
                   </button>
-                  <button class="btn btn-outline" style="margin-left: 8px">调拨审批</button>
                 </div>
               </div>
               <div v-if="showSeedCreateForm" class="card" style="margin-bottom: 16px">
@@ -1261,7 +1258,6 @@
                   <button class="btn btn-primary" @click="showEquipmentCreateForm = true">
                     + 新增设备
                   </button>
-                  <button class="btn btn-outline" style="margin-left: 8px">导出台账</button>
                 </div>
               </div>
               <div v-if="showEquipmentCreateForm" class="card" style="margin-bottom: 16px">
@@ -1797,23 +1793,83 @@
             <div class="card">
               <div class="card-header">
                 <div class="card-title">⚙️ 系统管理 - RBAC权限与用户管理</div>
-                <button class="btn btn-primary">+ 新增用户</button>
+                <button class="btn btn-primary" @click="showSystemUserCreateForm = true">
+                  + 新增用户
+                </button>
+              </div>
+              <div v-if="showSystemUserCreateForm" class="card" style="margin-bottom: 16px">
+                <div class="card-header">
+                  <div class="card-title">📝 新增用户</div>
+                  <button class="btn btn-outline" @click="showSystemUserCreateForm = false">
+                    ✕
+                  </button>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>用户名</label>
+                    <input v-model="systemUserCreateForm.username" placeholder="请输入用户名" />
+                  </div>
+                  <div class="form-group">
+                    <label>姓名</label>
+                    <input v-model="systemUserCreateForm.name" placeholder="请输入姓名" />
+                  </div>
+                  <div class="form-group">
+                    <label>密码</label>
+                    <input
+                      v-model="systemUserCreateForm.password"
+                      type="password"
+                      placeholder="请输入密码"
+                    />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>角色</label>
+                    <select v-model="systemUserCreateForm.role">
+                      <option value="admin">系统管理员</option>
+                      <option value="dispatcher">资源调度员</option>
+                      <option value="farmer">农户</option>
+                      <option value="analyst">数据分析师</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>部门</label>
+                    <input v-model="systemUserCreateForm.department" placeholder="请输入部门" />
+                  </div>
+                  <div class="form-group">
+                    <label>状态</label>
+                    <select v-model="systemUserCreateForm.status">
+                      <option :value="1">正常</option>
+                      <option :value="0">禁用</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="margin-top: 12px">
+                  <button class="btn btn-primary" @click="submitSystemUserCreate">提交</button>
+                  <button
+                    class="btn btn-outline"
+                    style="margin-left: 8px"
+                    @click="showSystemUserCreateForm = false"
+                  >
+                    取消
+                  </button>
+                </div>
               </div>
               <div class="stats-row">
                 <div class="stat-card">
-                  <div class="stat-value">47</div>
+                  <div class="stat-value">{{ systemStats.totalUsers }}</div>
                   <div class="stat-label">系统用户</div>
                 </div>
                 <div class="stat-card success">
-                  <div class="stat-value">4</div>
+                  <div class="stat-value">{{ systemStats.totalRoles }}</div>
                   <div class="stat-label">角色类型</div>
                 </div>
                 <div class="stat-card info">
-                  <div class="stat-value">58</div>
+                  <div class="stat-value">{{ systemStats.totalPermissions }}</div>
                   <div class="stat-label">权限节点</div>
                 </div>
                 <div class="stat-card warning">
-                  <div class="stat-value">1,286</div>
+                  <div class="stat-value">{{ systemStats.totalLogs }}</div>
                   <div class="stat-label">操作日志</div>
                 </div>
               </div>
@@ -1825,46 +1881,29 @@
                     <th>姓名</th>
                     <th>角色</th>
                     <th>部门</th>
-                    <th>权限组</th>
                     <th>状态</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td>U001</td>
-                    <td>admin</td>
-                    <td>张管理员</td>
-                    <td><span class="tag tag-danger">系统管理</span></td>
-                    <td>信息中心</td>
-                    <td>58/58</td>
-                    <td><span class="tag tag-success">正常</span></td>
+                  <tr v-if="systemUsersLoading">
+                    <td colspan="6" style="text-align: center; padding: 20px">加载中...</td>
                   </tr>
-                  <tr>
-                    <td>U002</td>
-                    <td>dispatcher01</td>
-                    <td>李调度员</td>
-                    <td><span class="tag tag-info">生产调度</span></td>
-                    <td>生产队长</td>
-                    <td>36/58</td>
-                    <td><span class="tag tag-success">正常</span></td>
+                  <tr v-else-if="systemUsers.length === 0">
+                    <td colspan="6" style="text-align: center; padding: 20px">暂无数据</td>
                   </tr>
-                  <tr>
-                    <td>U003</td>
-                    <td>farmer01</td>
-                    <td>王农艺师</td>
-                    <td><span class="tag tag-success">片区经理/农户</span></td>
-                    <td>东片区</td>
-                    <td>18/58</td>
-                    <td><span class="tag tag-success">正常</span></td>
-                  </tr>
-                  <tr>
-                    <td>U004</td>
-                    <td>analyst01</td>
-                    <td>赵分配员</td>
-                    <td><span class="tag tag-purple">数据分析</span></td>
-                    <td>数据员</td>
-                    <td>24/58</td>
-                    <td><span class="tag tag-success">正常</span></td>
+                  <tr v-for="user in systemUsers" :key="user.userId">
+                    <td>{{ user.userId }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.name }}</td>
+                    <td>
+                      <span class="tag" :class="roleTagClass(user.role)">{{ user.roleName }}</span>
+                    </td>
+                    <td>{{ user.department }}</td>
+                    <td>
+                      <span class="tag" :class="user.status === 1 ? 'tag-success' : 'tag-danger'">
+                        {{ user.status === 1 ? '正常' : '禁用' }}
+                      </span>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -1888,6 +1927,7 @@ import {
   equipmentApi,
   aiApi,
   predictApi,
+  systemApi,
 } from '../api'
 
 export default {
@@ -2070,6 +2110,23 @@ export default {
       resourcePredictData: null,
       resourceAreaOptions: ['全部'],
       resourceYearOptions: ['2025'],
+      systemUsers: [],
+      systemUsersLoading: false,
+      showSystemUserCreateForm: false,
+      systemUserCreateForm: {
+        username: '',
+        name: '',
+        password: '',
+        role: 'farmer',
+        department: '',
+        status: 1,
+      },
+      systemStats: {
+        totalUsers: 0,
+        totalRoles: 0,
+        totalPermissions: 0,
+        totalLogs: 0,
+      },
       equipmentList: [],
       equipmentTotal: 0,
       equipmentPage: 1,
@@ -2751,6 +2808,9 @@ export default {
       if (pageId === 'seed-predict') {
         this.loadSeedPredict()
       }
+      if (pageId === 'sys-user') {
+        this.loadSystemUsers()
+      }
       this.$nextTick(() => {
         setTimeout(() => this.initChartsForPage(pageId), 100)
       })
@@ -2891,6 +2951,85 @@ export default {
         console.warn('Seed predict API unavailable, using local fallback:', error)
         this.seedPredictData = null
       }
+    },
+    async loadSystemUsers() {
+      this.systemUsersLoading = true
+      try {
+        const res = await systemApi.users({
+          page: 1,
+          pageSize: 100,
+        })
+        const data = res?.data || res
+        const result = data?.data || data || {}
+        if (result && result.stats) {
+          this.systemStats = {
+            totalUsers: result.stats.totalUsers || 0,
+            totalRoles: result.stats.totalRoles || 0,
+            totalPermissions: result.stats.totalPermissions || 0,
+            totalLogs: result.stats.totalLogs || 0,
+          }
+        }
+        if (result && result.list) {
+          this.systemUsers = result.list
+        } else if (Array.isArray(result)) {
+          this.systemUsers = result
+        } else {
+          this.systemUsers = []
+        }
+      } catch (error) {
+        console.warn('System users API unavailable:', error)
+        this.systemUsers = []
+        this.systemStats = {
+          totalUsers: 0,
+          totalRoles: 0,
+          totalPermissions: 0,
+          totalLogs: 0,
+        }
+      } finally {
+        this.systemUsersLoading = false
+      }
+    },
+    resetSystemUserCreateForm() {
+      this.systemUserCreateForm = {
+        username: '',
+        name: '',
+        password: '',
+        role: 'farmer',
+        department: '',
+        status: 1,
+      }
+    },
+    async submitSystemUserCreate() {
+      const form = this.systemUserCreateForm
+      if (!form.username || !form.name || !form.password) {
+        alert('请填写用户名、姓名和密码')
+        return
+      }
+      try {
+        await systemApi.create({
+          username: form.username,
+          name: form.name,
+          password: form.password,
+          role: form.role,
+          department: form.department,
+          status: form.status,
+        })
+        alert('新增用户成功！')
+        this.showSystemUserCreateForm = false
+        this.resetSystemUserCreateForm()
+        this.loadSystemUsers()
+      } catch (error) {
+        alert('新增用户失败！' + (error.message || '未知错误'))
+      }
+    },
+    roleTagClass(role) {
+      const map = {
+        admin: 'tag-danger',
+        dispatcher: 'tag-info',
+        farmer: 'tag-success',
+        analyst: 'tag-purple',
+      }
+      return map[role] || 'tag-info'
     },
     async runWaterAI() {
       this.showLoading('AI水量优化分配计算..', '线性规划模型求解中...')

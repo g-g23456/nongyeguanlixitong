@@ -120,6 +120,9 @@ export const systemApi = {
   users(payload = {}) {
     return postAction('/system/users', payload)
   },
+  create(payload) {
+    return postAction('/system/create', payload)
+  },
 }
 
 export default {
