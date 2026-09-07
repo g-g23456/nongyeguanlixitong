@@ -25,4 +25,14 @@ public interface LaborService {
      * 新增劳动力
      */
     Result<?> laborCreate(Map<String, Object> request);
+
+    /**
+     * 更新劳动力
+     */
+    Result<?> laborUpdate(Map<String, Object> request);
+
+    /**
+     * 删除劳动力
+     */
+    Result<?> laborDelete(String laborId);
 }

@@ -25,4 +25,14 @@ public interface SeedService {
      * 消耗预测与库存预警
      */
     Result<?> seedPredict();
+
+    /**
+     * 更新农资
+     */
+    Result<?> seedUpdate(Map<String, Object> request);
+
+    /**
+     * 删除农资
+     */
+    Result<?> seedDelete(Long id);
 }

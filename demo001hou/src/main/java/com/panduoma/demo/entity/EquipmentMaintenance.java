@@ -23,8 +23,8 @@ public class EquipmentMaintenance {
     @TableId(value = "cost_id", type = IdType.AUTO)
     private Long costId;
 
-    @TableField("stat_month")
-    private String statMonth;
+    @TableField("stat_mouth")
+    private String statMouth;
 
     @TableField("total_cost")
     private BigDecimal totalCost;

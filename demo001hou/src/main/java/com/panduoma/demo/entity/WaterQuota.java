@@ -51,9 +51,9 @@ public class WaterQuota {
     @TableField("ai_evaluate")
     private String aiEvaluate;
 
-    @TableField("stat_month")
+    @TableField("stat_mouth")
     @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate statMonth;
+    private LocalDate statMouth;
 
     @TableField("updated_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

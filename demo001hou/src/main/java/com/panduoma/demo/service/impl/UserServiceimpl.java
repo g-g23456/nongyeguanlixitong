@@ -12,6 +12,7 @@ import com.panduoma.demo.response.Result;
 import com.panduoma.demo.service.UserService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -42,6 +43,7 @@ public class UserServiceimpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
+    @Transactional
     public Result<?> login(LoginDTO loginDTO) {
         System.out.println("=== 登录请求: username=" + loginDTO.getUsername()
                 + ", role=" + loginDTO.getRole() + " ===");
@@ -76,12 +78,15 @@ public class UserServiceimpl extends ServiceImpl<UserMapper, User> implements Us
         baseMapper.updateById(user);
 
         // 写入登录日志
-        System.out.println("=== 登录成功: u_id=" + user.getId() + ", role=" + user.getRole() + " ===");
-        LoginLog loginLog = new LoginLog();
-        loginLog.setUId(user.getId());
-        loginLog.setRole(user.getRole());
-        loginLog.setLoginTime(LocalDateTime.now());
-        loginLogMapper.insert(loginLog);
+        try {
+            LoginLog loginLog = new LoginLog();
+            loginLog.setUId(user.getId());
+            loginLog.setRole(user.getRole());
+            loginLog.setLoginTime(LocalDateTime.now());
+            loginLogMapper.insert(loginLog);
+        } catch (Exception e) {
+            System.err.println("=== 登录日志写入失败（不影响登录）: " + e.getMessage() + " ===");
+        }
 
         user.setPassword(null);
         return Result.data(user);
@@ -175,7 +180,6 @@ public class UserServiceimpl extends ServiceImpl<UserMapper, User> implements Us
 
         User user = new User();
         user.setUsername(username);
-        user.setName(name);
         user.setPassword(password);
         user.setRole(role);
         user.setDepartment(department);

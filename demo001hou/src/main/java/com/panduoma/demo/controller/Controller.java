@@ -142,11 +142,30 @@ public class Controller {
         return farmlandService.farmlandOptimize(request);
     }
 
+    @Operation(summary = "获取最新的优化结果")
+    @PostMapping("/farmland/optimize/latest")
+    public Result<?> farmlandOptimizeLatest() {
+        return farmlandService.getLatestOptimize();
+    }
+
     @Operation(summary = "获取地块轮作历史数据")
     @PostMapping("/farmland/rotation")
     public Result<?> farmlandRotation(@RequestBody Map<String, Object> request) {
         Integer year = request != null && request.get("year") != null ? ((Number) request.get("year")).intValue() : null;
         return farmlandService.farmlandRotation(year);
+    }
+
+    @Operation(summary = "更新耕地地块")
+    @PostMapping("/farmland/update")
+    public Result<?> farmlandUpdate(@RequestBody FarmlandBlock farmlandBlock) {
+        return farmlandService.farmlandUpdate(farmlandBlock);
+    }
+
+    @Operation(summary = "删除耕地地块")
+    @PostMapping("/farmland/delete")
+    public Result<?> farmlandDelete(@RequestBody Map<String, Object> request) {
+        Long id = request != null && request.get("id") != null ? ((Number) request.get("id")).longValue() : null;
+        return farmlandService.farmlandDelete(id);
     }
 
     @Operation(summary = "水位配额")
@@ -179,6 +198,13 @@ public class Controller {
     public Result<?> waterQuotaUpdate(@RequestBody Map<String, Object> request) {
         return waterService.waterQuotaUpdate(request);
     }
+
+    @Operation(summary = "删除水位配额")
+    @PostMapping("/water/quota/delete")
+    public Result<?> waterQuotaDelete(@RequestBody Map<String, Object> request) {
+        Long id = request != null && request.get("id") != null ? ((Number) request.get("id")).longValue() : null;
+        return waterService.waterQuotaDelete(id);
+    }
     @Operation(summary = "农资库存")
     @PostMapping("/seed/inventory")
     public Result<?> seedInventory(@RequestBody(required = false) FarmlandListRequest request) {
@@ -203,6 +229,19 @@ public class Controller {
     @PostMapping("/seed/predict")
     public Result<?> seedPredict() {
         return seedService.seedPredict();
+    }
+
+    @Operation(summary = "更新农资")
+    @PostMapping("/seed/update")
+    public Result<?> seedUpdate(@RequestBody Map<String, Object> request) {
+        return seedService.seedUpdate(request);
+    }
+
+    @Operation(summary = "删除农资")
+    @PostMapping("/seed/delete")
+    public Result<?> seedDelete(@RequestBody Map<String, Object> request) {
+        Long id = request != null && request.get("id") != null ? ((Number) request.get("id")).longValue() : null;
+        return seedService.seedDelete(id);
     }
     @Operation(summary = "劳动力列表")
     @PostMapping("/labor/list")
@@ -230,6 +269,19 @@ public class Controller {
         return laborService.laborCreate(request);
     }
 
+    @Operation(summary = "更新劳动力")
+    @PostMapping("/labor/update")
+    public Result<?> laborUpdate(@RequestBody Map<String, Object> request) {
+        return laborService.laborUpdate(request);
+    }
+
+    @Operation(summary = "删除劳动力")
+    @PostMapping("/labor/delete")
+    public Result<?> laborDelete(@RequestBody Map<String, Object> request) {
+        String laborId = request != null && request.get("id") != null ? request.get("id").toString() : null;
+        return laborService.laborDelete(laborId);
+    }
+
     @Operation(summary = "农机具台账")
     @PostMapping("/equipment/list")
     public Result<?> equipmentList(@RequestBody(required = false) FarmlandListRequest request) {
@@ -242,6 +294,19 @@ public class Controller {
     @PostMapping("/equipment/create")
     public Result<?> equipmentCreate(@RequestBody Map<String, Object> request) {
         return equipmentService.equipmentCreate(request);
+    }
+
+    @Operation(summary = "更新设备")
+    @PostMapping("/equipment/update")
+    public Result<?> equipmentUpdate(@RequestBody Map<String, Object> request) {
+        return equipmentService.equipmentUpdate(request);
+    }
+
+    @Operation(summary = "删除设备")
+    @PostMapping("/equipment/delete")
+    public Result<?> equipmentDelete(@RequestBody Map<String, Object> request) {
+        Long id = request != null && request.get("id") != null ? ((Number) request.get("id")).longValue() : null;
+        return equipmentService.equipmentDelete(id);
     }
     @Operation(summary = "设备调配分布")
     @PostMapping("/equipment/status")

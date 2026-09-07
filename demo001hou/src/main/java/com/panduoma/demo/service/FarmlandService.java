@@ -25,4 +25,19 @@ public interface FarmlandService {
      * 获取地块轮作历史数据
      */
     Result<?> farmlandRotation(Integer year);
+
+    /**
+     * 更新耕地地块
+     */
+    Result<?> farmlandUpdate(FarmlandBlock farmlandBlock);
+
+    /**
+     * 删除耕地地块
+     */
+    Result<?> farmlandDelete(Long id);
+
+    /**
+     * 获取最新的优化结果
+     */
+    Result<?> getLatestOptimize();
 }

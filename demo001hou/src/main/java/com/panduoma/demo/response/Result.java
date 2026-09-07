@@ -1,5 +1,8 @@
 package com.panduoma.demo.response;
 
+import lombok.Data;
+
+@Data
 public class Result<T> {
     private Integer code;
     private String message;
@@ -17,16 +20,6 @@ public class Result<T> {
         this.code = code;
         this.message = message;
         this.data = data;
-    }
-
-    public Integer getCode() {
-        return code;
-    }
-    public String getMessage() {
-        return message;
-    }
-    public T getData() {
-        return data;
     }
 
     public static <T> Result<T> success(){

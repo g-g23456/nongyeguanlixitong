@@ -45,4 +45,14 @@ public interface EquipmentService {
      * 资源需求智能预测
      */
     Result<?> resourcePrediction(Map<String, Object> request);
+
+    /**
+     * 更新设备
+     */
+    Result<?> equipmentUpdate(Map<String, Object> request);
+
+    /**
+     * 删除设备
+     */
+    Result<?> equipmentDelete(Long id);
 }

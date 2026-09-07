@@ -27,9 +27,9 @@ public class SeedForecast {
     @TableField("product_code")
     private String productCode;
 
-    @TableField("stat_month")
+    @TableField("stat_mouth")
     @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate statMonth;
+    private LocalDate statMouth;
 
     @TableField("history_consumption")
     private BigDecimal historyConsumption;

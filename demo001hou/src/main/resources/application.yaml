@@ -53,3 +53,5 @@ sa-token:
   is-share: false
   token-style: uuid
   is-log: true
+  is-read-body: true
+  is-read-header: true

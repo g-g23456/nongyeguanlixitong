@@ -26,6 +26,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -85,6 +86,7 @@ public class FarmlandServiceImpl implements FarmlandService {
         List<Map<String, Object>> items = new ArrayList<>();
         for (FarmlandBlock record : records) {
             Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", record.getId());
             item.put("blockCode", record.getBlockCode());
             item.put("region", record.getRegionId() != null
                     ? regionNameMap.getOrDefault(record.getRegionId(), "未知片区") : "未知片区");
@@ -149,8 +151,21 @@ public class FarmlandServiceImpl implements FarmlandService {
         if (!StringUtils.hasText(farmlandBlock.getBlockCode())) {
             return Result.error("地块编码不能为空");
         }
-        if (!StringUtils.hasText(farmlandBlock.getBlockName())) {
-            return Result.error("地块名称不能为空");
+
+        // 根据片区名字查找或创建 regions 记录，获取 region_id
+        if (StringUtils.hasText(farmlandBlock.getRegionName())) {
+            Region region = regionMapper.selectOne(
+                    new QueryWrapper<Region>().eq("name", farmlandBlock.getRegionName()).last("LIMIT 1")
+            );
+            if (region == null) {
+                // 片区不存在，自动创建
+                region = Region.builder()
+                        .name(farmlandBlock.getRegionName())
+                        .code("R-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                        .build();
+                regionMapper.insert(region);
+            }
+            farmlandBlock.setRegionId(region.getId());
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -171,7 +186,7 @@ public class FarmlandServiceImpl implements FarmlandService {
             // 根据 year 查询 farmland_blocks 数据
             List<FarmlandBlock> blocks = farmlandBlockMapper.selectList(
                     new QueryWrapper<FarmlandBlock>()
-                            .likeRight("stat_month", request.getYear().toString())
+                            .likeRight("stat_mouth", request.getYear().toString())
             );
 
             // 构建 prompt，包含地块数据
@@ -189,6 +204,7 @@ public class FarmlandServiceImpl implements FarmlandService {
             Famlandoptimize optimize = Famlandoptimize.builder()
                     .taskId(UUID.randomUUID().toString().replace("-", ""))
                     .requestPayload(objectMapper.writeValueAsString(payloadToSave))
+                    .responsePayload(objectMapper.writeValueAsString(deepseekResult))
                     .createdAt(LocalDateTime.now())
                     .build();
             farmlandOptimizeResultMapper.insert(optimize);
@@ -206,8 +222,8 @@ public class FarmlandServiceImpl implements FarmlandService {
             return Result.error("年份参数不能为空");
         }
 
-        int yearStart = year * 100;
-        int yearEnd = yearStart + 99;
+        String yearStart = year + "-01-01";
+        String yearEnd = year + "-12-31";
 
         List<Farmlandrotation> records = farmlandRotationMapper.selectList(
                 new QueryWrapper<Farmlandrotation>()
@@ -224,10 +240,7 @@ public class FarmlandServiceImpl implements FarmlandService {
             if (record.getMouth() == null || !StringUtils.hasText(record.getPlan())) {
                 continue;
             }
-            int monthIndex = record.getMouth() - yearStart + 1;
-            if (monthIndex < 1 || monthIndex > 12) {
-                continue;
-            }
+            int monthIndex = record.getMouth().getMonthValue();
 
             monthCropMap.computeIfAbsent(monthIndex, k -> new LinkedHashMap<>());
 
@@ -283,6 +296,51 @@ public class FarmlandServiceImpl implements FarmlandService {
         return Result.data(result);
     }
 
+    @Override
+    public Result<?> farmlandUpdate(FarmlandBlock farmlandBlock) {
+        if (farmlandBlock == null || farmlandBlock.getId() == null) {
+            return Result.error("地块ID不能为空");
+        }
+        FarmlandBlock existing = farmlandBlockMapper.selectById(farmlandBlock.getId());
+        if (existing == null) {
+            return Result.error("地块不存在");
+        }
+        farmlandBlock.setUpdatedAt(LocalDateTime.now());
+        farmlandBlockMapper.updateById(farmlandBlock);
+        return Result.success("更新成功");
+    }
+
+    @Override
+    public Result<?> farmlandDelete(Long id) {
+        if (id == null) {
+            return Result.error("地块ID不能为空");
+        }
+        FarmlandBlock existing = farmlandBlockMapper.selectById(id);
+        if (existing == null) {
+            return Result.error("地块不存在");
+        }
+        farmlandBlockMapper.deleteById(id);
+        return Result.success("删除成功");
+    }
+
+    @Override
+    public Result<?> getLatestOptimize() {
+        Famlandoptimize latest = farmlandOptimizeResultMapper.selectOne(
+                new QueryWrapper<Famlandoptimize>()
+                        .orderByDesc("id")
+                        .last("LIMIT 1")
+        );
+        if (latest == null || !StringUtils.hasText(latest.getResponsePayload())) {
+            return Result.data(new LinkedHashMap<>());
+        }
+        try {
+            Map<String, Object> result = objectMapper.readValue(latest.getResponsePayload(), Map.class);
+            return Result.data(result);
+        } catch (Exception e) {
+            return Result.data(new LinkedHashMap<>());
+        }
+    }
+
     // ==================== 私有辅助方法 ====================
 
     private String buildDeepseekPrompt(FarmlandOptimizeRequest request, List<FarmlandBlock> blocks) throws JsonProcessingException {
@@ -307,7 +365,7 @@ public class FarmlandServiceImpl implements FarmlandService {
         return prompt.toString();
     }
 
-    private Map<String, Object> callDeepseek(String prompt) throws Exception {
+    private Map<String, Object> callDeepseek(String prompt) {
         String apiKey = StringUtils.hasText(deepseekApiKey)
                 ? deepseekApiKey
                 : System.getenv().getOrDefault("DEEPSEEK_API_KEY", "");
@@ -315,40 +373,49 @@ public class FarmlandServiceImpl implements FarmlandService {
             return buildFallbackResult();
         }
 
-        String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("model", "deepseek-chat");
-        payload.put("temperature", 0.2);
-        payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+        try {
+            String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("model", "deepseek-chat");
+            payload.put("temperature", 0.2);
+            payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/v1/chat/completions"))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-                .build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/chat/completions"))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .timeout(Duration.ofSeconds(60))
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
 
-        HttpClient httpClient = HttpClient.newHttpClient();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 400) {
-            throw new IllegalStateException("DeepSeek API 调用失败，HTTP 状态：" + response.statusCode() + "，响应：" + response.body());
-        }
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 400) {
+                System.err.println("DeepSeek API 返回错误状态: " + response.statusCode() + ", 回退到本地策略");
+                return buildFallbackResult();
+            }
 
-        Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
-        if (choices == null || choices.isEmpty()) {
+            Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
+            if (choices == null || choices.isEmpty()) {
+                return buildFallbackResult();
+            }
+
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            String content = Objects.toString(message.get("content"), "");
+            String cleanJson = content.trim();
+            if (cleanJson.startsWith("```")) {
+                cleanJson = cleanJson.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
+            }
+
+            Map<String, Object> result = objectMapper.readValue(cleanJson, Map.class);
+            return normalizeOptimizationResult(result);
+        } catch (Exception e) {
+            System.err.println("DeepSeek API 调用失败: " + e.getMessage() + ", 回退到本地策略");
             return buildFallbackResult();
         }
-
-        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-        String content = Objects.toString(message.get("content"), "");
-        String cleanJson = content.trim();
-        if (cleanJson.startsWith("```")) {
-            cleanJson = cleanJson.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
-        }
-
-        Map<String, Object> result = objectMapper.readValue(cleanJson, Map.class);
-        return normalizeOptimizationResult(result);
     }
 
     private Map<String, Object> buildFallbackResult() {

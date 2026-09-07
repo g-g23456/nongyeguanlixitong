@@ -35,4 +35,9 @@ public interface WaterService {
      * 水位配额配置调整
      */
     Result<?> waterQuotaUpdate(Map<String, Object> request);
+
+    /**
+     * 删除水位配额
+     */
+    Result<?> waterQuotaDelete(Long id);
 }

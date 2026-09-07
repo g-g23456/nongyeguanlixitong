@@ -21,6 +21,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -85,11 +86,12 @@ public class SeedServiceImpl implements SeedService {
             BigDecimal threshold = record.getSafetyThreshold() != null ? record.getSafetyThreshold() : BigDecimal.ZERO;
             boolean belowThreshold = stock.compareTo(threshold) < 0;
 
-            String expiry = record.getStatMonth() != null
-                    ? record.getStatMonth().getYear() + "-" + String.format("%02d", record.getStatMonth().getMonthValue())
+            String expiry = record.getStatMouth() != null
+                    ? record.getStatMouth().getYear() + "-" + String.format("%02d", record.getStatMouth().getMonthValue())
                     : "";
 
             Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", record.getId());
             item.put("code", record.getSku());
             item.put("name", record.getProductName());
             item.put("type", record.getCategory());
@@ -136,7 +138,7 @@ public class SeedServiceImpl implements SeedService {
                 .inventory(stock)
                 .safetyThreshold(threshold)
                 .status(status)
-                .statMonth(LocalDate.now().withDayOfMonth(1))
+                .statMouth(LocalDate.now().withDayOfMonth(1))
                 .build();
 
         seedInventoryMapper.insert(entity);
@@ -150,7 +152,7 @@ public class SeedServiceImpl implements SeedService {
         data.put("inventory", entity.getInventory());
         data.put("safety_threshold", entity.getSafetyThreshold());
         data.put("status", entity.getStatus());
-        data.put("stat_month", entity.getStatMonth());
+        data.put("stat_mouth", entity.getStatMouth());
         data.put("updated_at", entity.getUpdatedAt());
 
         return Result.data("入库登记成功", data);
@@ -203,7 +205,7 @@ public class SeedServiceImpl implements SeedService {
         return prompt.toString();
     }
 
-    private Map<String, Object> callDeepseek(String prompt) throws Exception {
+    private Map<String, Object> callDeepseek(String prompt) {
         String apiKey = StringUtils.hasText(deepseekApiKey)
                 ? deepseekApiKey
                 : System.getenv().getOrDefault("DEEPSEEK_API_KEY", "");
@@ -211,39 +213,48 @@ public class SeedServiceImpl implements SeedService {
             return buildFallbackAllocation();
         }
 
-        String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("model", "deepseek-chat");
-        payload.put("temperature", 0.2);
-        payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+        try {
+            String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("model", "deepseek-chat");
+            payload.put("temperature", 0.2);
+            payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/v1/chat/completions"))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-                .build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/chat/completions"))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .timeout(Duration.ofSeconds(60))
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
 
-        HttpClient httpClient = HttpClient.newHttpClient();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 400) {
-            throw new IllegalStateException("DeepSeek API 调用失败，HTTP 状态：" + response.statusCode());
-        }
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 400) {
+                System.err.println("DeepSeek API 返回错误状态: " + response.statusCode() + ", 回退到本地策略");
+                return buildFallbackAllocation();
+            }
 
-        Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
-        if (choices == null || choices.isEmpty()) {
+            Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
+            if (choices == null || choices.isEmpty()) {
+                return buildFallbackAllocation();
+            }
+
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            String content = Objects.toString(message.get("content"), "").trim();
+            if (content.startsWith("```")) {
+                content = content.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
+            }
+
+            Map<String, Object> result = objectMapper.readValue(content, Map.class);
+            return normalizeAllocationResult(result);
+        } catch (Exception e) {
+            System.err.println("DeepSeek API 调用失败: " + e.getMessage() + ", 回退到本地策略");
             return buildFallbackAllocation();
         }
-
-        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-        String content = Objects.toString(message.get("content"), "").trim();
-        if (content.startsWith("```")) {
-            content = content.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
-        }
-
-        Map<String, Object> result = objectMapper.readValue(content, Map.class);
-        return normalizeAllocationResult(result);
     }
 
     private void saveAllocationResult(String prompt, Map<String, Object> aiResult) {
@@ -300,7 +311,7 @@ public class SeedServiceImpl implements SeedService {
     public Result<?> seedPredict() {
         // 查询全部预测数据
         List<SeedForecast> forecasts = seedForecastMapper.selectList(
-                new QueryWrapper<SeedForecast>().orderByAsc("stat_month", "product_code"));
+                new QueryWrapper<SeedForecast>().orderByAsc("stat_mouth", "product_code"));
 
         // 查询 seed_inventory 建立 product_code -> product_name 映射
         List<SeedInventory> inventories = seedInventoryMapper.selectList(new QueryWrapper<>());
@@ -329,7 +340,7 @@ public class SeedServiceImpl implements SeedService {
         BigDecimal totalInventory = BigDecimal.ZERO;
 
         for (SeedForecast f : forecasts) {
-            int monthIdx = f.getStatMonth() != null ? f.getStatMonth().getMonthValue() - 1 : 0;
+            int monthIdx = f.getStatMouth() != null ? f.getStatMouth().getMonthValue() - 1 : 0;
             if (monthIdx >= 0 && monthIdx < 12) {
                 historySum[monthIdx] = historySum[monthIdx].add(
                         f.getHistoryConsumption() != null ? f.getHistoryConsumption() : BigDecimal.ZERO);
@@ -413,5 +424,40 @@ public class SeedServiceImpl implements SeedService {
         data.put("alert", alert);
 
         return Result.data("预测完成", data);
+    }
+
+    @Override
+    public Result<?> seedUpdate(Map<String, Object> request) {
+        if (request == null || request.get("id") == null) {
+            return Result.error("农资ID不能为空");
+        }
+        Long id = ((Number) request.get("id")).longValue();
+        SeedInventory existing = seedInventoryMapper.selectById(id);
+        if (existing == null) {
+            return Result.error("农资记录不存在");
+        }
+
+        if (request.containsKey("code")) existing.setSku(request.get("code").toString());
+        if (request.containsKey("name")) existing.setProductName(request.get("name").toString());
+        if (request.containsKey("type")) existing.setCategory(request.get("type").toString());
+        if (request.containsKey("stock")) existing.setInventory(new BigDecimal(request.get("stock").toString()));
+        if (request.containsKey("threshold")) existing.setSafetyThreshold(new BigDecimal(request.get("threshold").toString()));
+        if (request.containsKey("status")) existing.setStatus(request.get("status").toString());
+
+        seedInventoryMapper.updateById(existing);
+        return Result.success("更新成功");
+    }
+
+    @Override
+    public Result<?> seedDelete(Long id) {
+        if (id == null) {
+            return Result.error("农资ID不能为空");
+        }
+        SeedInventory existing = seedInventoryMapper.selectById(id);
+        if (existing == null) {
+            return Result.error("农资记录不存在");
+        }
+        seedInventoryMapper.deleteById(id);
+        return Result.success("删除成功");
     }
 }

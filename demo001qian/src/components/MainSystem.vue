@@ -417,6 +417,75 @@
                   </button>
                 </div>
               </div>
+              <div v-if="showFarmlandEditForm" class="card" style="margin-bottom: 16px">
+                <h3>编辑耕地地块</h3>
+                <div class="form-group">
+                  <label>地块编号</label>
+                  <input v-model="farmlandEditForm.blockCode" placeholder="GZ-001" />
+                </div>
+                <div class="form-group">
+                  <label>所属片区</label>
+                  <select v-model="farmlandEditForm.region">
+                    <option value="">请选择片区</option>
+                    <option v-for="r in regionOptions" :key="r" :value="r">{{ r }}</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>面积（亩）</label>
+                  <input v-model.number="farmlandEditForm.area" type="number" placeholder="50" />
+                </div>
+                <div class="form-group">
+                  <label>土壤类型</label>
+                  <select v-model="farmlandEditForm.soilType">
+                    <option value="">请选择土壤类型</option>
+                    <option>黑土</option>
+                    <option>黄土</option>
+                    <option>沙土</option>
+                    <option>黏土</option>
+                    <option>红壤</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>适宜作物（逗号分隔）</label>
+                  <input v-model="farmlandEditForm.suitableCropsStr" placeholder="小麦,玉米,大豆" />
+                </div>
+                <div class="form-group">
+                  <label>当前作物</label>
+                  <input v-model="farmlandEditForm.currentCrop" placeholder="小麦" />
+                </div>
+                <div class="form-group">
+                  <label>权属</label>
+                  <select v-model="farmlandEditForm.ownership">
+                    <option value="">请选择权属</option>
+                    <option>集体</option>
+                    <option>承包</option>
+                    <option>流转</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>可种植周期</label>
+                  <input v-model="farmlandEditForm.plantingPeriod" placeholder="春播-秋收" />
+                </div>
+                <div class="form-group">
+                  <label>状态</label>
+                  <select v-model="farmlandEditForm.status">
+                    <option value="">请选择状态</option>
+                    <option>待播种</option>
+                    <option>种植中</option>
+                    <option>休耕</option>
+                  </select>
+                </div>
+                <div style="margin-top: 12px">
+                  <button class="btn btn-primary" @click="submitFarmlandUpdate">保存</button>
+                  <button
+                    class="btn btn-outline"
+                    style="margin-left: 8px"
+                    @click="showFarmlandEditForm = false"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
               <div class="stats-row">
                 <div class="stat-card">
                   <div class="stat-value">{{ farmlandStats.totalArea.toLocaleString() }}</div>
@@ -450,6 +519,7 @@
                     <th>权属</th>
                     <th>可种植周期</th>
                     <th>状态</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -473,9 +543,13 @@
                         >{{ item.status }}</span
                       >
                     </td>
+                    <td>
+                      <button class="btn btn-outline btn-sm" @click="editFarmland(item)">编辑</button>
+                      <button class="btn btn-danger btn-sm" style="margin-left:4px" @click="deleteFarmland(item)">删除</button>
+                    </td>
                   </tr>
                   <tr v-if="farmlandList.length === 0">
-                    <td colspan="9" style="text-align: center; padding: 20px">暂无数据</td>
+                    <td colspan="10" style="text-align: center; padding: 20px">暂无数据</td>
                   </tr>
                 </tbody>
               </table>
@@ -667,6 +741,7 @@
                     <th>作物类型</th>
                     <th>AI评估</th>
                     <th>状态</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -688,6 +763,9 @@
                         :class="'tag ' + (item.status === '正常' ? 'tag-success' : 'tag-warning')"
                         >{{ item.status }}</span
                       >
+                    </td>
+                    <td>
+                      <button class="btn btn-danger btn-sm" @click="deleteWaterQuota(item)">删除</button>
                     </td>
                   </tr>
                 </tbody>
@@ -929,6 +1007,53 @@
                   </button>
                 </div>
               </div>
+              <div v-if="showSeedEditForm" class="card" style="margin-bottom: 16px">
+                <div class="card-header">
+                  <div class="card-title">✏️ 编辑农资</div>
+                  <button class="btn btn-outline" @click="showSeedEditForm = false">✕</button>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>物资编号</label>
+                    <input v-model="seedEditForm.code" placeholder="如：S008" />
+                  </div>
+                  <div class="form-group">
+                    <label>名称</label>
+                    <input v-model="seedEditForm.name" placeholder="如：复合肥" />
+                  </div>
+                  <div class="form-group">
+                    <label>类型</label>
+                    <select v-model="seedEditForm.type">
+                      <option value="化肥">化肥</option>
+                      <option value="农药">农药</option>
+                      <option value="种子">种子</option>
+                      <option value="农膜">农膜</option>
+                      <option value="农机配件">农机配件</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>库存量</label>
+                    <input v-model.number="seedEditForm.stock" type="number" />
+                  </div>
+                  <div class="form-group">
+                    <label>安全阈值</label>
+                    <input v-model.number="seedEditForm.threshold" type="number" />
+                  </div>
+                  <div class="form-group">
+                    <label>状态</label>
+                    <select v-model="seedEditForm.status">
+                      <option value="正常">正常</option>
+                      <option value="紧张">紧张</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="margin-top: 12px">
+                  <button class="btn btn-primary" @click="submitSeedUpdate">保存</button>
+                  <button class="btn btn-outline" style="margin-left: 8px" @click="showSeedEditForm = false">取消</button>
+                </div>
+              </div>
               <div class="stats-row">
                 <div
                   class="stat-card"
@@ -954,6 +1079,7 @@
                     <th>有效期</th>
                     <th>AI预警</th>
                     <th>状态</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -976,6 +1102,10 @@
                         :class="'tag ' + (item.status === '正常' ? 'tag-success' : 'tag-warning')"
                         >{{ item.status }}</span
                       >
+                    </td>
+                    <td>
+                      <button class="btn btn-outline btn-sm" @click="editSeed(item)">编辑</button>
+                      <button class="btn btn-danger btn-sm" style="margin-left:4px" @click="deleteSeed(item)">删除</button>
                     </td>
                   </tr>
                 </tbody>
@@ -1153,6 +1283,76 @@
                   </button>
                 </div>
               </div>
+              <div v-if="showLaborEditForm" class="card" style="margin-bottom: 16px">
+                <div class="card-header">
+                  <div class="card-title">✏️ 编辑劳动力</div>
+                  <button class="btn btn-outline" @click="showLaborEditForm = false">✕</button>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>编号</label>
+                    <input v-model="laborEditForm.id" disabled />
+                  </div>
+                  <div class="form-group">
+                    <label>姓名</label>
+                    <input v-model="laborEditForm.name" />
+                  </div>
+                  <div class="form-group">
+                    <label>工种</label>
+                    <select v-model="laborEditForm.type">
+                      <option value="农机操作">农机操作</option>
+                      <option value="灌溉管理">灌溉管理</option>
+                      <option value="种植技术员">种植技术员</option>
+                      <option value="设备维护">设备维护</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>技能等级</label>
+                    <select v-model="laborEditForm.level">
+                      <option value="初级">初级</option>
+                      <option value="中级">中级</option>
+                      <option value="高级">高级</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>所属片区</label>
+                    <select v-model="laborEditForm.area">
+                      <option value="东片区">东片区</option>
+                      <option value="西片区">西片区</option>
+                      <option value="南片区">南片区</option>
+                      <option value="北片区">北片区</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>日薪(元)</label>
+                    <input v-model.number="laborEditForm.salary" type="number" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>可用时段</label>
+                    <select v-model="laborEditForm.available">
+                      <option value="全天">全天</option>
+                      <option value="白天">白天</option>
+                      <option value="夜间">夜间</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>状态</label>
+                    <select v-model="laborEditForm.status">
+                      <option value="在岗">在岗</option>
+                      <option value="请假">请假</option>
+                      <option value="离职">离职</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="margin-top: 12px">
+                  <button class="btn btn-primary" @click="submitLaborUpdate">保存</button>
+                  <button class="btn btn-outline" style="margin-left: 8px" @click="showLaborEditForm = false">取消</button>
+                </div>
+              </div>
               <div v-if="laborLoading" style="text-align: center; padding: 40px">加载中...</div>
               <table v-else class="data-table">
                 <thead>
@@ -1165,6 +1365,7 @@
                     <th>日薪(元)</th>
                     <th>可用时段</th>
                     <th>状态</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1187,9 +1388,13 @@
                         >{{ item.status }}</span
                       >
                     </td>
+                    <td>
+                      <button class="btn btn-outline btn-sm" @click="editLabor(item)">编辑</button>
+                      <button class="btn btn-danger btn-sm" style="margin-left:4px" @click="deleteLabor(item)">删除</button>
+                    </td>
                   </tr>
                   <tr v-if="laborList.length === 0">
-                    <td colspan="8" style="text-align: center; padding: 20px">暂无数据</td>
+                    <td colspan="9" style="text-align: center; padding: 20px">暂无数据</td>
                   </tr>
                 </tbody>
               </table>
@@ -1335,6 +1540,67 @@
                   </button>
                 </div>
               </div>
+              <div v-if="showEquipmentEditForm" class="card" style="margin-bottom: 16px">
+                <div class="card-header">
+                  <div class="card-title">✏️ 编辑设备</div>
+                  <button class="btn btn-outline" @click="showEquipmentEditForm = false">✕</button>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>设备编号</label>
+                    <input v-model="equipmentEditForm.id" disabled />
+                  </div>
+                  <div class="form-group">
+                    <label>设备名称</label>
+                    <input v-model="equipmentEditForm.name" />
+                  </div>
+                  <div class="form-group">
+                    <label>类型</label>
+                    <select v-model="equipmentEditForm.type">
+                      <option value="收割设备">收割设备</option>
+                      <option value="耕作设备">耕作设备</option>
+                      <option value="播种设备">播种设备</option>
+                      <option value="灌溉设备">灌溉设备</option>
+                      <option value="植保设备">植保设备</option>
+                      <option value="施肥设备">施肥设备</option>
+                      <option value="加工设备">加工设备</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>片区</label>
+                    <select v-model="equipmentEditForm.area">
+                      <option value="东区">东区</option>
+                      <option value="西区">西区</option>
+                      <option value="南区">南区</option>
+                      <option value="北区">北区</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>作业效率</label>
+                    <input v-model="equipmentEditForm.eff" />
+                  </div>
+                  <div class="form-group">
+                    <label>当前状态</label>
+                    <select v-model="equipmentEditForm.status">
+                      <option value="正常">正常</option>
+                      <option value="维护">维护</option>
+                      <option value="待修">待修</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>AI健康评分</label>
+                    <input v-model.number="equipmentEditForm.score" type="number" min="0" max="100" />
+                  </div>
+                </div>
+                <div style="margin-top: 12px">
+                  <button class="btn btn-primary" @click="submitEquipmentUpdate">保存</button>
+                  <button class="btn btn-outline" style="margin-left: 8px" @click="showEquipmentEditForm = false">取消</button>
+                </div>
+              </div>
               <div class="stats-row">
                 <div class="stat-card">
                   <div class="stat-value">{{ equipmentStats.total }}</div>
@@ -1364,6 +1630,7 @@
                     <th>作业效率</th>
                     <th>当前状态</th>
                     <th>AI健康评分</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1399,9 +1666,13 @@
                         {{ eq.score }}
                       </span>
                     </td>
+                    <td>
+                      <button class="btn btn-outline btn-sm" @click="editEquipment(eq)">编辑</button>
+                      <button class="btn btn-danger btn-sm" style="margin-left:4px" @click="deleteEquipment(eq)">删除</button>
+                    </td>
                   </tr>
                   <tr v-if="equipmentList.length === 0">
-                    <td colspan="7" style="text-align: center; padding: 20px">暂无数据</td>
+                    <td colspan="8" style="text-align: center; padding: 20px">暂无数据</td>
                   </tr>
                 </tbody>
               </table>
@@ -1950,6 +2221,8 @@ export default {
       dashboardData: null,
       dashAlerts: [],
       showFarmlandCreateForm: false,
+      showFarmlandEditForm: false,
+      farmlandEditForm: { id: null, blockCode: '', region: '', area: 0, soilType: '', suitableCropsStr: '', currentCrop: '', ownership: '', plantingPeriod: '', status: '' },
       farmlandList: [],
       farmlandStatsData: null,
       farmlandTotal: 0,
@@ -1965,6 +2238,8 @@ export default {
       laborScheduleArea: '全部片区',
       laborScheduleResult: null,
       showLaborCreateForm: false,
+      showLaborEditForm: false,
+      laborEditForm: { id: '', name: '', type: '农机操作', level: '初级', area: '东片区', salary: 0, available: '全天', status: '在岗' },
       laborCreateForm: {
         id: '',
         name: '',
@@ -2023,6 +2298,8 @@ export default {
       seedInventoryPageSize: 20,
       seedInventoryTotal: 0,
       showSeedCreateForm: false,
+      showSeedEditForm: false,
+      seedEditForm: { id: null, code: '', name: '', type: '化肥', stock: null, threshold: null, status: '正常' },
       seedCreateForm: {
         code: '',
         name: '',
@@ -2137,6 +2414,8 @@ export default {
       equipmentAllocationResult: null,
       maintenanceData: null,
       showEquipmentCreateForm: false,
+      showEquipmentEditForm: false,
+      equipmentEditForm: { dbId: null, id: '', name: '', type: '收割设备', area: '东区', eff: '', status: '正常', score: 80 },
       equipmentCreateForm: {
         id: '',
         name: '',
@@ -2372,6 +2651,67 @@ export default {
         alert('新增地块失败！' + (error.message || '未知错误'))
       }
     },
+    editFarmland(item) {
+      this.farmlandEditForm = {
+        id: item.id,
+        blockCode: item.blockCode || '',
+        region: item.region || '',
+        area: item.area || 0,
+        soilType: item.soilType || '',
+        suitableCropsStr: (item.suitableCrops || []).join(','),
+        currentCrop: item.currentCrop || '',
+        ownership: item.ownership || '',
+        plantingPeriod: item.plantingPeriod || '',
+        status: item.status || '',
+      }
+      this.showFarmlandEditForm = true
+    },
+    async submitFarmlandUpdate() {
+      const form = this.farmlandEditForm
+      if (!form.id) {
+        alert('缺少地块ID')
+        return
+      }
+      const payload = {
+        id: form.id,
+        blockCode: form.blockCode,
+        name: form.blockCode,
+        area: form.area,
+        soilType: form.soilType,
+        currentCrop: form.currentCrop,
+        ownership: form.ownership,
+        plantingPeriod: form.plantingPeriod,
+        status: form.status,
+      }
+      try {
+        await farmlandApi.update(payload)
+        alert('更新成功！')
+        this.showFarmlandEditForm = false
+        this.loadFarmlandList()
+      } catch (error) {
+        alert('更新失败！' + (error.message || '未知错误'))
+      }
+    },
+    async deleteFarmland(item) {
+      if (!confirm('确定删除地块「' + item.blockCode + '」吗？此操作不可恢复。')) return
+      try {
+        await farmlandApi.delete({ id: item.id })
+        alert('删除成功！')
+        this.loadFarmlandList()
+      } catch (error) {
+        alert('删除失败！' + (error.message || '未知错误'))
+      }
+    },
+    async deleteWaterQuota(item) {
+      if (!confirm('确定删除片区「' + item.area + '」的配额记录吗？')) return
+      try {
+        await waterApi.delete({ id: item.id })
+        alert('删除成功！')
+        this.loadWaterQuota()
+      } catch (error) {
+        alert('删除失败！' + (error.message || '未知错误'))
+      }
+    },
     resetSeedCreateForm() {
       this.seedCreateForm = {
         code: '',
@@ -2408,6 +2748,51 @@ export default {
         this.loadSeedInventory()
       } catch (error) {
         alert('入库登记失败！' + (error.message || '未知错误'))
+      }
+    },
+    editSeed(item) {
+      this.seedEditForm = {
+        id: item.id,
+        code: item.code || '',
+        name: item.name || '',
+        type: item.type || '化肥',
+        stock: item.stock,
+        threshold: item.threshold,
+        status: item.status || '正常',
+      }
+      this.showSeedEditForm = true
+    },
+    async submitSeedUpdate() {
+      const form = this.seedEditForm
+      if (!form.id) {
+        alert('缺少农资ID')
+        return
+      }
+      try {
+        await seedApi.update({
+          id: form.id,
+          code: form.code,
+          name: form.name,
+          type: form.type,
+          stock: form.stock,
+          threshold: form.threshold,
+          status: form.status,
+        })
+        alert('更新成功！')
+        this.showSeedEditForm = false
+        this.loadSeedInventory()
+      } catch (error) {
+        alert('更新失败！' + (error.message || '未知错误'))
+      }
+    },
+    async deleteSeed(item) {
+      if (!confirm('确定删除农资「' + item.name + '」吗？此操作不可恢复。')) return
+      try {
+        await seedApi.delete({ id: item.id })
+        alert('删除成功！')
+        this.loadSeedInventory()
+      } catch (error) {
+        alert('删除失败！' + (error.message || '未知错误'))
       }
     },
     buildFarmlandOptimizePayload() {
@@ -2467,36 +2852,12 @@ export default {
           this.dashAlerts = data.alerts || data.warnings || []
         }
       } catch (error) {
-        console.warn('Dashboard API unavailable, using local mock data:', error)
+        console.error('Dashboard API 请求失败:', error)
         this.dashboardData = null
-        this.dashAlerts = this.getFallbackAlerts()
+        this.dashAlerts = []
       } finally {
         this.$nextTick(() => this.initDashboardCharts())
       }
-    },
-    getFallbackAlerts() {
-      return [
-        {
-          icon: '⚠️',
-          bg: '#fffbe6',
-          text: '西片区用水配额使用率已达 <strong style="color:#faad14">89.2%</strong>，建议启动节水方案',
-        },
-        {
-          icon: '🔴',
-          bg: '#fff1f0',
-          text: '南片区播种机C型 <strong style="color:#f5222d">逾期维护12天</strong>，请尽快安排检修',
-        },
-        {
-          icon: 'ℹ️',
-          bg: '#e6f7ff',
-          text: '化肥库存低于安全阈值，AI建议 <strong style="color:#1890ff">补充600吨复合肥</strong>',
-        },
-        {
-          icon: '✅',
-          bg: '#f6ffed',
-          text: '东片区AI种植结构优化方案已执行，<strong style="color:#52c41a">预计增产12.5%</strong>',
-        },
-      ]
     },
     async loadFarmlandList() {
       this.farmlandLoading = true
@@ -2572,6 +2933,53 @@ export default {
         status: '在岗',
       }
     },
+    editLabor(item) {
+      this.laborEditForm = {
+        id: item.id || '',
+        name: item.name || '',
+        type: item.type || '农机操作',
+        level: item.level || '初级',
+        area: item.area || '东片区',
+        salary: item.salary || 0,
+        available: item.available || '全天',
+        status: item.status || '在岗',
+      }
+      this.showLaborEditForm = true
+    },
+    async submitLaborUpdate() {
+      const form = this.laborEditForm
+      if (!form.id) {
+        alert('缺少劳动力编号')
+        return
+      }
+      try {
+        await laborApi.update({
+          id: form.id,
+          name: form.name,
+          type: form.type,
+          level: form.level,
+          area: form.area,
+          salary: form.salary,
+          available: form.available,
+          status: form.status,
+        })
+        alert('更新成功！')
+        this.showLaborEditForm = false
+        this.loadLaborList()
+      } catch (error) {
+        alert('更新失败！' + (error.message || '未知错误'))
+      }
+    },
+    async deleteLabor(item) {
+      if (!confirm('确定删除劳动力「' + item.name + '」吗？此操作不可恢复。')) return
+      try {
+        await laborApi.delete({ id: item.id })
+        alert('删除成功！')
+        this.loadLaborList()
+      } catch (error) {
+        alert('删除失败！' + (error.message || '未知错误'))
+      }
+    },
     async loadLaborSchedule() {
       try {
         const res = await laborApi.oldSchedule()
@@ -2580,6 +2988,8 @@ export default {
       } catch (error) {
         console.warn('Labor old schedule API unavailable:', error)
         this.laborScheduleResult = null
+      } finally {
+        this.$nextTick(() => this.initLaborChart())
       }
     },
     async loadWaterQuota() {
@@ -2590,10 +3000,10 @@ export default {
         const result = data?.data || data || {}
         if (result && (result.totalQuota || result.items)) {
           this.waterQuotaData = {
-            totalQuota: result.totalQuota ?? 2450,
-            allocated: result.allocated ?? 1870,
-            remaining: result.remaining ?? 580,
-            usageRate: result.usageRate ?? 76.3,
+            totalQuota: result.totalQuota ?? 0,
+            allocated: result.allocated ?? 0,
+            remaining: result.remaining ?? 0,
+            usageRate: result.usageRate ?? 0,
             items: result.items || [],
           }
         }
@@ -2752,6 +3162,52 @@ export default {
         score: null,
       }
     },
+    editEquipment(eq) {
+      this.equipmentEditForm = {
+        dbId: eq.dbId,
+        id: eq.id || '',
+        name: eq.name || '',
+        type: eq.type || '收割设备',
+        area: eq.area || '东区',
+        eff: eq.eff || '',
+        status: eq.status || '正常',
+        score: eq.score || 80,
+      }
+      this.showEquipmentEditForm = true
+    },
+    async submitEquipmentUpdate() {
+      const form = this.equipmentEditForm
+      if (!form.dbId) {
+        alert('缺少设备ID')
+        return
+      }
+      try {
+        await equipmentApi.update({
+          id: form.dbId,
+          name: form.name,
+          type: form.type,
+          area: form.area,
+          eff: form.eff,
+          status: form.status,
+          score: form.score,
+        })
+        alert('更新成功！')
+        this.showEquipmentEditForm = false
+        this.loadEquipmentList()
+      } catch (error) {
+        alert('更新失败！' + (error.message || '未知错误'))
+      }
+    },
+    async deleteEquipment(eq) {
+      if (!confirm('确定删除设备「' + eq.name + '」吗？此操作不可恢复。')) return
+      try {
+        await equipmentApi.delete({ id: eq.dbId })
+        alert('删除成功！')
+        this.loadEquipmentList()
+      } catch (error) {
+        alert('删除失败！' + (error.message || '未知错误'))
+      }
+    },
     prevSeedInventoryPage() {
       if (this.seedInventoryPage > 1) {
         this.seedInventoryPage--
@@ -2836,6 +3292,21 @@ export default {
         if (c && c.resize) c.resize()
       })
     },
+    async loadFarmlandOptimize() {
+      try {
+        const res = await farmlandApi.getLatestOptimize()
+        const data = res?.data || res
+        const result = data?.data || data || {}
+
+        if (result && (result.cropDistribution || result.blockSuitability || result.optimizationMetrics)) {
+          this.normalizeOptimizeResult(result)
+          return
+        }
+      } catch (error) {
+        console.warn('加载最新优化结果失败:', error)
+      }
+      this.$nextTick(() => this.initCropCharts())
+    },
     async runAIOptimize() {
       this.showLoading('AI种植结构优化计算..', '遗传算法初始化种群（500个体）..')
 
@@ -2857,33 +3328,11 @@ export default {
           return
         }
       } catch (error) {
-        console.warn(
-          'Farmland optimization API unavailable, using local fallback mock data:',
-          error,
-        )
+        console.error('耕地优化 API 请求失败:', error)
       }
 
-      const fallback = {
-        cropDistribution: [
-          { name: '水稻', percentage: 38.5 },
-          { name: '小麦', percentage: 27.0 },
-          { name: '玉米', percentage: 24.5 },
-          { name: '大豆', percentage: 10.0 },
-        ],
-        blockSuitability: [
-          { blockId: 101, blockCode: 'F001', recommendedCrop: '水稻', suitabilityScore: 92 },
-          { blockId: 102, blockCode: 'F002', recommendedCrop: '小麦', suitabilityScore: 88 },
-          { blockId: 103, blockCode: 'F003', recommendedCrop: '玉米', suitabilityScore: 90 },
-          { blockId: 104, blockCode: 'F004', recommendedCrop: '大豆', suitabilityScore: 85 },
-        ],
-        optimizationMetrics: {
-          objectiveConvergence: 0.987,
-          constraintSatisfactionRate: 0.96,
-        },
-      }
-
-      this.normalizeOptimizeResult(fallback)
       this.hideLoading()
+      alert('AI种植结构优化请求失败，请检查后端服务是否正常运行')
     },
     async loadWaterStatus() {
       try {
@@ -2898,6 +3347,8 @@ export default {
       } catch (error) {
         console.warn('Water status API unavailable, using local fallback:', error)
         this.waterChartData = null
+      } finally {
+        this.$nextTick(() => this.initWaterCharts())
       }
     },
     async loadWaterAnalysis() {
@@ -2916,6 +3367,7 @@ export default {
         this.waterAnalysisData = null
       } finally {
         this.waterAnalysisLoading = false
+        this.$nextTick(() => this.initWaterAnalysisCharts())
       }
     },
     async loadSeedInventory() {
@@ -2950,6 +3402,8 @@ export default {
       } catch (error) {
         console.warn('Seed predict API unavailable, using local fallback:', error)
         this.seedPredictData = null
+      } finally {
+        this.$nextTick(() => this.initSeedPredictCharts())
       }
     },
     async loadSystemUsers() {
@@ -3051,16 +3505,16 @@ export default {
         this.initWaterCharts()
         alert(
           'AI水量优化分配完成！\n\n预计节水: ' +
-            (result.waterSaved || 8.3) +
+            (result.waterSaved ?? '--') +
             '%\n平均增产: ' +
-            (result.yieldIncrease || 9.2) +
+            (result.yieldIncrease ?? '--') +
             '%',
         )
       } catch (error) {
         this.hideLoading()
-        console.warn('Water allocation API unavailable, using local fallback:', error)
+        console.error('Water allocation API 请求失败:', error)
         this.initWaterCharts()
-        alert('AI水量优化分配完成！\n\n预计节水: 8.3%\n平均增产: 9.2%')
+        alert('AI水量优化分配请求失败，请检查后端服务')
       }
     },
     runSeedAI() {
@@ -3078,20 +3532,20 @@ export default {
           if (result && (result.series || result.allocation)) {
             this.seedAllocChartData = result
             this.$nextTick(() => this.initSeedAllocChart())
-            const tips = result.tips || '化肥利用率提升 12.5%\n成本降低: 8.6%'
-            alert('AI农资分配完成！\n\n' + tips)
+            const tips = result.tips || ''
+            alert('AI农资分配完成！' + (tips ? '\n\n' + tips : ''))
           } else {
             this.seedAllocChartData = null
             this.initSeedAllocChart()
-            alert('AI农资分配完成！\n\n化肥利用率提升 12.5%\n成本降低: 8.6%')
+            alert('AI农资分配完成！')
           }
         })
         .catch((error) => {
           this.hideLoading()
-          console.warn('Seed allocation API unavailable, using local fallback:', error)
+          console.error('Seed allocation API 请求失败:', error)
           this.seedAllocChartData = null
           this.initSeedAllocChart()
-          alert('AI农资分配完成！\n\n化肥利用率提升 12.5%\n成本降低: 8.6%')
+          alert('AI农资分配请求失败，请检查后端服务')
         })
     },
     async runLaborAI() {
@@ -3109,11 +3563,11 @@ export default {
         const gapPercent = data?.gapPercent ?? 0
         alert(`智能排班完成！\n\n整体匹配度 ${matchRate}%\n缺口: ${gapPercent}%`)
       } catch (error) {
-        console.warn('智能排班API调用失败:', error)
+        console.error('智能排班API调用失败:', error)
         this.laborScheduleResult = null
         this.hideLoading()
         this.initLaborChart()
-        alert('智能排班完成！\n\n整体匹配度 96.8%\n缺口: 15%')
+        alert('智能排班请求失败，请检查后端服务')
       }
     },
     async loadEquipmentStatus() {
@@ -3153,13 +3607,13 @@ export default {
         const data = res?.data || res
         this.equipmentAllocationResult = data
         this.initEquipmentCharts()
-        const dr = data?.distanceReduction ?? '23.5'
-        const ei = data?.efficiencyImprovement ?? '18.5'
+        const dr = data?.distanceReduction ?? '--'
+        const ei = data?.efficiencyImprovement ?? '--'
         alert(`路径优化排程完成！\n\n总行驶距离减少 ${dr}%\n作业效率提升: ${ei}%`)
       } catch (error) {
-        console.warn('Equipment allocation API unavailable:', error)
+        console.error('Equipment allocation API 请求失败:', error)
         this.initEquipmentCharts()
-        alert('路径优化排程完成！\n\n总行驶距离减少 23.5%\n作业效率提升: 18.5%')
+        alert('路径优化排程请求失败，请检查后端服务')
       } finally {
         this.hideLoading()
       }
@@ -3207,31 +3661,25 @@ export default {
           this.loadDashboardData()
           break
         case 'farmland-optimize':
-          this.initCropCharts()
+          this.loadFarmlandOptimize()
           break
         case 'farmland-rotation':
           this.initRotationChart()
           break
         case 'water-allocation':
-          this.initWaterCharts()
           break
         case 'water-analysis':
-          this.initWaterAnalysisCharts()
           break
         case 'seed-allocation':
           this.initSeedAllocChart()
           break
         case 'seed-predict':
-          this.initSeedPredictCharts()
           break
         case 'labor-schedule':
-          this.initLaborChart()
           break
         case 'equipment-allocation':
-          this.initEquipmentCharts()
           break
         case 'equipment-maintenance':
-          this.initMaintenanceCharts()
           break
         case 'ai-decision':
           if (this.aiDecisionResultVisible) this.initAIDecisionCharts()
@@ -3251,64 +3699,20 @@ export default {
       if (!this.$refs.chartDash1) return
 
       const d = this.dashboardData
-      const months = (d && d.chart1 && d.chart1.xAxis) || ['1月', '2月', '3月', '4月', '5月', '6月']
-      const areas = (d && d.chart2 && d.chart2.xAxis) || ['东片区', '西片区', '南片区', '北片区']
-      const chart3XAxis = (d && d.chart3 && d.chart3.xAxis) || [
-        '1月',
-        '2月',
-        '3月',
-        '4月',
-        '5月',
-        '6月',
-        '7月',
-        '8月',
-        '9月',
-        '10月',
-        '11月',
-        '12月',
-      ]
+      const months = (d && d.chart1 && d.chart1.xAxis) || []
+      const areas = (d && d.chart2 && d.chart2.xAxis) || []
+      const chart3XAxis = (d && d.chart3 && d.chart3.xAxis) || []
 
       const c1 = echarts.init(this.$refs.chartDash1)
       c1.setOption({
         tooltip: { trigger: 'axis' },
         legend: {
-          data: (d && d.chart1 && d.chart1.legend) || ['耕地', '用水', '农资', '人力', '器械'],
+          data: (d && d.chart1 && d.chart1.legend) || [],
           bottom: 0,
         },
         xAxis: { type: 'category', data: months },
         yAxis: { type: 'value' },
-        series: (d && d.chart1 && d.chart1.series) || [
-          {
-            name: '耕地',
-            type: 'bar',
-            data: [3200, 3500, 3800, 4100, 4400, 4500],
-            itemStyle: { color: '#52c41a' },
-          },
-          {
-            name: '用水',
-            type: 'bar',
-            data: [800, 850, 900, 950, 1000, 1050],
-            itemStyle: { color: '#1890ff' },
-          },
-          {
-            name: '农资',
-            type: 'bar',
-            data: [200, 220, 240, 260, 280, 300],
-            itemStyle: { color: '#fa8c16' },
-          },
-          {
-            name: '人力',
-            type: 'bar',
-            data: [100, 110, 120, 130, 140, 150],
-            itemStyle: { color: '#722ed1' },
-          },
-          {
-            name: '器械',
-            type: 'bar',
-            data: [80, 90, 100, 110, 120, 130],
-            itemStyle: { color: '#eb2f96' },
-          },
-        ],
+        series: (d && d.chart1 && d.chart1.series) || [],
       })
       this.charts['dash1'] = c1
 
@@ -3318,21 +3722,7 @@ export default {
         legend: { bottom: 0 },
         xAxis: { type: 'category', data: areas },
         yAxis: { type: 'value' },
-        series: (d && d.chart2 && d.chart2.series) || [
-          {
-            name: '耕地(亩)',
-            type: 'bar',
-            data: [3200, 2800, 2500, 4356],
-            itemStyle: { color: '#52c41a' },
-          },
-          {
-            name: '用水(万m³)',
-            type: 'line',
-            data: [800, 650, 550, 450],
-            smooth: true,
-            itemStyle: { color: '#1890ff' },
-          },
-        ],
+        series: (d && d.chart2 && d.chart2.series) || [],
       })
       this.charts['dash2'] = c2
 
@@ -3340,46 +3730,12 @@ export default {
       c3.setOption({
         tooltip: { trigger: 'axis' },
         legend: {
-          data: (d && d.chart3 && d.chart3.legend) || [
-            '耕地利用率',
-            '水资源利用率',
-            '农资利用率',
-            '人力利用率',
-          ],
+          data: (d && d.chart3 && d.chart3.legend) || [],
           bottom: 0,
         },
         xAxis: { type: 'category', data: chart3XAxis },
         yAxis: { type: 'value', max: 100 },
-        series: (d && d.chart3 && d.chart3.series) || [
-          {
-            name: '耕地利用率',
-            type: 'line',
-            data: [72, 74, 76, 78, 80, 82, 84, 83, 81, 79, 77, 75],
-            smooth: true,
-            itemStyle: { color: '#52c41a' },
-          },
-          {
-            name: '水资源利用率',
-            type: 'line',
-            data: [65, 67, 69, 71, 73, 75, 77, 76, 74, 72, 70, 68],
-            smooth: true,
-            itemStyle: { color: '#1890ff' },
-          },
-          {
-            name: '农资利用率',
-            type: 'line',
-            data: [60, 62, 64, 66, 68, 70, 73, 72, 70, 67, 64, 62],
-            smooth: true,
-            itemStyle: { color: '#fa8c16' },
-          },
-          {
-            name: '人力利用率',
-            type: 'line',
-            data: [70, 72, 74, 76, 78, 80, 82, 81, 79, 77, 75, 73],
-            smooth: true,
-            itemStyle: { color: '#722ed1' },
-          },
-        ],
+        series: (d && d.chart3 && d.chart3.series) || [],
       })
       this.charts['dash3'] = c3
     },
@@ -3396,13 +3752,7 @@ export default {
               color: ['#52c41a', '#faad14', '#1890ff', '#722ed1', '#eb2f96'][index % 5],
             },
           }))
-        : [
-            { value: 32, name: '水稻 32.0%', itemStyle: { color: '#52c41a' } },
-            { value: 28, name: '小麦 28.0%', itemStyle: { color: '#faad14' } },
-            { value: 22, name: '玉米 22.0%', itemStyle: { color: '#1890ff' } },
-            { value: 14, name: '大豆 14.0%', itemStyle: { color: '#722ed1' } },
-            { value: 4, name: '其他 4.0%', itemStyle: { color: '#eb2f96' } },
-          ]
+        : []
 
       const scoreSeries = this.optimizeResult?.blockSuitability?.length
         ? this.optimizeResult.blockSuitability.map((item) => ({
@@ -3481,16 +3831,11 @@ export default {
         const result = data?.data || data || {}
         crops = result.crops
       } catch (error) {
-        console.warn('Rotation API unavailable, using local fallback:', error)
+        console.error('Rotation API 请求失败:', error)
       }
 
       if (!crops || !Array.isArray(crops) || crops.length === 0) {
-        crops = [
-          { name: '水稻', data: [280, 280, 350, 400, 420, 380, 350, 320, 300, 260, 250, 260] },
-          { name: '小麦', data: [300, 280, 250, 200, 180, 150, 160, 180, 220, 300, 320, 310] },
-          { name: '玉米', data: [200, 220, 260, 300, 320, 300, 280, 250, 230, 200, 180, 190] },
-          { name: '休耕', data: [120, 120, 100, 80, 60, 80, 90, 100, 110, 120, 130, 120] },
-        ]
+        crops = []
       }
 
       const colorMap = {
@@ -3544,18 +3889,8 @@ export default {
       if (this.charts['water-radar']) this.charts['water-radar'].dispose()
       if (!this.$refs.chartWaterCompare) return
       const d = this.waterChartData || {}
-      const tradArr = d.traditional || [
-        { area: '东片区', value: 850 },
-        { area: '西片区', value: 720 },
-        { area: '南片区', value: 600 },
-        { area: '北片区', value: 500 },
-      ]
-      const aiArr = d.aiOptimized || [
-        { area: '东片区', value: 800 },
-        { area: '西片区', value: 650 },
-        { area: '南片区', value: 550 },
-        { area: '北片区', value: 450 },
-      ]
+      const tradArr = d.traditional || []
+      const aiArr = d.aiOptimized || []
       const areas = tradArr.map((item) => item.area)
       const tradVals = tradArr.map((item) => item.value)
       const aiVals = aiArr.map((item) => item.value)
@@ -3581,8 +3916,8 @@ export default {
         ],
       })
       this.charts['water-compare'] = c1
-      const curEff = d.currentEfficiency || [65, 78, 55, 72, 60]
-      const aiEff = d.aiEfficiency || [88, 92, 85, 90, 87]
+      const curEff = d.currentEfficiency || []
+      const aiEff = d.aiEfficiency || []
       const c2 = echarts.init(this.$refs.chartWaterRadar)
       c2.setOption({
         tooltip: {},
@@ -3703,37 +4038,8 @@ export default {
       if (!this.$refs.chartSeedAlloc) return
       const c = echarts.init(this.$refs.chartSeedAlloc)
       const apiData = this.seedAllocChartData
-      const series = apiData?.series || [
-        {
-          name: '水稻',
-          type: 'bar',
-          stack: 'a',
-          data: [850, 620, 25, 35],
-          itemStyle: { color: '#52c41a' },
-        },
-        {
-          name: '小麦',
-          type: 'bar',
-          stack: 'a',
-          data: [720, 540, 18, 28],
-          itemStyle: { color: '#faad14' },
-        },
-        {
-          name: '玉米',
-          type: 'bar',
-          stack: 'a',
-          data: [380, 280, 12, 15],
-          itemStyle: { color: '#1890ff' },
-        },
-        {
-          name: '大豆',
-          type: 'bar',
-          stack: 'a',
-          data: [230, 120, 9, 7],
-          itemStyle: { color: '#722ed1' },
-        },
-      ]
-      const xData = apiData?.categories || ['复合肥', '尿素', '杀虫剂', '种子']
+      const series = apiData?.series || []
+      const xData = apiData?.categories || []
       const legendData = apiData?.legend || series.map((s) => s.name)
       c.setOption({
         tooltip: { trigger: 'axis' },
@@ -3749,37 +4055,8 @@ export default {
       if (this.charts['seed-alert']) this.charts['seed-alert'].dispose()
       if (!this.$refs.chartSeedPredict) return
       const apiData = this.seedPredictData
-      const trendXData = apiData?.trendMonths || [
-        '1月',
-        '2月',
-        '3月',
-        '4月',
-        '5月',
-        '6月',
-        '7月',
-        '8月',
-        '9月',
-        '10月',
-        '11月',
-        '12月',
-      ]
-      const trendSeries = apiData?.trend || [
-        {
-          name: '历史消耗',
-          type: 'line',
-          data: [520, 480, 560, 600, 650, 720, 780, 750, 700, 680, 620, 580],
-          itemStyle: { color: '#1890ff' },
-          smooth: true,
-        },
-        {
-          name: 'AI预测',
-          type: 'line',
-          data: [540, 500, 580, 620, 680, 750, 810, 780, 730, 700, 640, 600],
-          itemStyle: { color: '#52c41a' },
-          lineStyle: { type: 'dashed' },
-          smooth: true,
-        },
-      ]
+      const trendXData = apiData?.trendMonths || []
+      const trendSeries = apiData?.trend || []
       const c1 = echarts.init(this.$refs.chartSeedPredict)
       c1.setOption({
         tooltip: { trigger: 'axis' },
@@ -3789,21 +4066,8 @@ export default {
         series: trendSeries,
       })
       this.charts['seed-predict'] = c1
-      const radarIndicator = apiData?.radarIndicator || [
-        { name: '复合肥', max: 100 },
-        { name: '尿素', max: 100 },
-        { name: '杀虫剂', max: 100 },
-        { name: '种子', max: 100 },
-        { name: '有机肥', max: 100 },
-      ]
-      const radarData = apiData?.radar || [
-        {
-          value: [75, 68, 35, 82, 60],
-          name: '当前库存安全阈值',
-          itemStyle: { color: '#1890ff' },
-          areaStyle: { opacity: 0.2 },
-        },
-      ]
+      const radarIndicator = apiData?.radarIndicator || []
+      const radarData = apiData?.radar || []
       const c2 = echarts.init(this.$refs.chartSeedAlert)
       c2.setOption({
         tooltip: { trigger: 'axis' },
@@ -3825,12 +4089,7 @@ export default {
       if (!this.$refs.chartLabor) return
       const c = echarts.init(this.$refs.chartLabor)
       const d = this.laborScheduleResult
-      const chartData = d?.chartData || [
-        { task: '春耕播种', demand: 1200, supply: 1100, gap: 100 },
-        { task: '夏种管理', demand: 980, supply: 920, gap: 60 },
-        { task: '秋收作业', demand: 1500, supply: 1450, gap: 50 },
-        { task: '冬藏整地', demand: 600, supply: 580, gap: 20 },
-      ]
+      const chartData = d?.chartData || []
       c.setOption({
         tooltip: { trigger: 'axis' },
         legend: { data: ['需求人数', '供给人数', '缺口'], bottom: 0 },
@@ -3864,15 +4123,9 @@ export default {
       if (this.charts['equip-bar']) this.charts['equip-bar'].dispose()
       if (!this.$refs.chartEquipPie) return
       const r = this.equipmentAllocationResult
-      const pieData = r?.pieData || [
-        { value: 45, name: '收割设备', itemStyle: { color: '#52c41a' } },
-        { value: 40, name: '耕作设备', itemStyle: { color: '#1890ff' } },
-        { value: 33, name: '播种设备', itemStyle: { color: '#faad14' } },
-        { value: 32, name: '灌溉设备', itemStyle: { color: '#722ed1' } },
-        { value: 12, name: '植保设备', itemStyle: { color: '#eb2f96' } },
-      ]
-      const barCat = r?.barCategories || ['东区', '西区', '南区', '北区']
-      const barData = r?.barData || [92, 88, 85, 78]
+      const pieData = r?.pieData || []
+      const barCat = r?.barCategories || []
+      const barData = r?.barData || []
       const c1 = echarts.init(this.$refs.chartEquipPie)
       c1.setOption({
         tooltip: { trigger: 'item' },
@@ -3902,15 +4155,8 @@ export default {
       if (this.charts['maint-cost']) this.charts['maint-cost'].dispose()
       if (!this.$refs.chartMaintHealth) return
       const md = this.maintenanceData
-      const healthData = (md && md.healthStatus) || [
-        { value: 82, name: '健康', itemStyle: { color: '#52c41a' } },
-        { value: 12, name: '亚健康', itemStyle: { color: '#faad14' } },
-        { value: 6, name: '需维护', itemStyle: { color: '#f5222d' } },
-      ]
-      const costData = (md && md.costTrend) || {
-        months: ['1月', '2月', '3月', '4月', '5月', '6月'],
-        values: [3.2, 2.8, 4.5, 3.6, 5.2, 4.8],
-      }
+      const healthData = (md && md.healthStatus) || []
+      const costData = (md && md.costTrend) || { months: [], values: [] }
       const c1 = echarts.init(this.$refs.chartMaintHealth)
       c1.setOption({
         tooltip: { trigger: 'item' },
@@ -3946,27 +4192,8 @@ export default {
       if (this.charts['ai-pie']) this.charts['ai-pie'].dispose()
       if (!this.$refs.chartAiRadar) return
       const ad = this.aiDecisionData
-      const radarData = (ad && ad.radar) || [
-        {
-          value: [75, 60, 70, 65, 72, 68],
-          name: '人工调配',
-          itemStyle: { color: '#faad14' },
-          areaStyle: { opacity: 0.2 },
-        },
-        {
-          value: [92, 88, 85, 82, 90, 91],
-          name: 'AI优化',
-          itemStyle: { color: '#52c41a' },
-          areaStyle: { opacity: 0.3 },
-        },
-      ]
-      const pieData = (ad && ad.resourceAllocation) || [
-        { value: 32, name: '耕地优化', itemStyle: { color: '#52c41a' } },
-        { value: 25, name: '水资源', itemStyle: { color: '#1890ff' } },
-        { value: 20, name: '农资分配', itemStyle: { color: '#faad14' } },
-        { value: 15, name: '人力调度', itemStyle: { color: '#722ed1' } },
-        { value: 8, name: '器械调配', itemStyle: { color: '#eb2f96' } },
-      ]
+      const radarData = (ad && ad.radar) || []
+      const pieData = (ad && ad.resourceAllocation) || []
       const c1 = echarts.init(this.$refs.chartAiRadar)
       c1.setOption({
         tooltip: {},
@@ -4043,39 +4270,7 @@ export default {
       if (this.yieldData && this.yieldData.trend) {
         return { months: this.yieldData.trend.months || months, data: this.yieldData.trend }
       }
-      const base = {
-        2020: {
-          rice: [3100, 3120, 3150, 3180, 3200, 3220, 3250, 3280, 3300, 3320, 3350, 3200],
-          wheat: [2000, 2020, 2050, 2080, 2100, 2120, 2150, 2180, 2200, 2220, 2250, 2100],
-          corn: [2700, 2720, 2750, 2780, 2800, 2820, 2850, 2880, 2900, 2920, 2950, 2800],
-        },
-        2021: {
-          rice: [3250, 3280, 3300, 3320, 3350, 3380, 3400, 3420, 3450, 3480, 3500, 3350],
-          wheat: [2080, 2100, 2120, 2150, 2180, 2200, 2220, 2250, 2280, 2300, 2320, 2180],
-          corn: [2820, 2850, 2880, 2900, 2920, 2950, 2980, 3000, 3020, 3050, 3080, 2920],
-        },
-        2022: {
-          rice: [3350, 3380, 3400, 3420, 3450, 3480, 3500, 3520, 3550, 3580, 3600, 3450],
-          wheat: [2150, 2180, 2200, 2220, 2250, 2280, 2300, 2320, 2350, 2380, 2400, 2250],
-          corn: [2950, 2980, 3000, 3020, 3050, 3080, 3100, 3120, 3150, 3180, 3200, 3050],
-        },
-        2023: {
-          rice: [3480, 3500, 3520, 3550, 3580, 3600, 3620, 3650, 3680, 3700, 3720, 3580],
-          wheat: [2220, 2250, 2280, 2300, 2320, 2350, 2380, 2400, 2420, 2450, 2480, 2320],
-          corn: [3080, 3100, 3120, 3150, 3180, 3200, 3220, 3250, 3280, 3300, 3320, 3180],
-        },
-        2024: {
-          rice: [3580, 3600, 3620, 3650, 3680, 3700, 3720, 3750, 3780, 3800, 3820, 3680],
-          wheat: [2280, 2300, 2320, 2350, 2380, 2400, 2420, 2450, 2480, 2500, 2520, 2380],
-          corn: [3180, 3200, 3220, 3250, 3280, 3300, 3320, 3350, 3380, 3400, 3420, 3280],
-        },
-        2025: {
-          rice: [3680, 3700, 3720, 3750, 3780, 3800, 3820, 3850, 3880, 3900, 3920, 3850],
-          wheat: [2380, 2400, 2420, 2450, 2480, 2500, 2520, 2550, 2580, 2600, 2620, 2480],
-          corn: [3280, 3300, 3320, 3350, 3380, 3400, 3420, 3450, 3480, 3500, 3520, 3400],
-        },
-      }
-      return { months, data: base[year] || base['2025'] }
+      return { months, data: { rice: [], wheat: [], corn: [] } }
     },
     onYieldFilterChange() {
       this.loadYieldData()
@@ -4117,11 +4312,7 @@ export default {
       })
       this.charts['yield-trend'] = c1
       const c2 = echarts.init(this.$refs.chartYieldPie)
-      const pieData = (this.yieldData && this.yieldData.pie) || [
-        { value: 3850, name: '水稻 42%', itemStyle: { color: '#52c41a' } },
-        { value: 2480, name: '小麦 27%', itemStyle: { color: '#faad14' } },
-        { value: 3400, name: '玉米 31%', itemStyle: { color: '#1890ff' } },
-      ]
+      const pieData = (this.yieldData && this.yieldData.pie) || []
       c2.setOption({
         tooltip: { trigger: 'item' },
         legend: { bottom: 0 },
@@ -4183,19 +4374,11 @@ export default {
           seed: this.resourcePredictData.seed,
         }
       }
-      const fallback = {
+      return {
         months,
-        water: {
-          agriculture: [180, 195, 220, 250, 280, 310, 350, 340, 300, 260, 220, 190],
-          ecology: [25, 27, 30, 32, 35, 38, 42, 40, 36, 32, 28, 26],
-        },
-        seed: {
-          fertilizer: [160, 175, 195, 215, 240, 265, 285, 275, 240, 210, 185, 170],
-          pesticide: [4.5, 4.8, 5.2, 5.6, 6.0, 6.5, 7.0, 6.8, 5.8, 5.2, 4.6, 4.2],
-          seed: [24, 26, 28, 30, 32, 34, 36, 35, 31, 28, 26, 24],
-        },
+        water: { agriculture: [], ecology: [] },
+        seed: { fertilizer: [], pesticide: [], seed: [] },
       }
-      return fallback
     },
     initResourcePredictCharts() {
       if (this.charts['predict-water']) this.charts['predict-water'].dispose()

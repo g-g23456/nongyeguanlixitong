@@ -25,9 +25,6 @@ public class FarmlandBlock {
     @TableField("block_code")
     private String blockCode;
 
-    @TableField("name")
-    private String blockName;
-
     @JsonIgnore
     @TableField("region_id")
     private Long regionId;
@@ -56,8 +53,8 @@ public class FarmlandBlock {
     @TableField("status")
     private String status;
 
-    @TableField("stat_month")
-    private String statMonth;
+    @TableField("stat_mouth")
+    private String statMouth;
 
     @TableField("created_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

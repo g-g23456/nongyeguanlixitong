@@ -41,9 +41,9 @@ public class Equipment {
     @TableField("status")
     private String status;
 
-    @TableField("stat_month")
+    @TableField("stat_mouth")
     @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate statMonth;
+    private LocalDate statMouth;
 
     @TableField("score")
     private Integer score;

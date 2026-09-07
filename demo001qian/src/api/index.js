@@ -28,8 +28,17 @@ export const farmlandApi = {
   create(payload) {
     return postAction('/farmland/create', payload)
   },
+  update(payload) {
+    return postAction('/farmland/update', payload)
+  },
+  delete(payload) {
+    return postAction('/farmland/delete', payload)
+  },
   optimize(payload = {}) {
     return postAction('/farmland/optimize', payload)
+  },
+  getLatestOptimize(payload = {}) {
+    return postAction('/farmland/optimize/latest', payload)
   },
   rotation(payload = {}) {
     return postAction('/farmland/rotation', payload)
@@ -52,6 +61,9 @@ export const waterApi = {
   updateQuota(payload = {}) {
     return postAction('/water/quota/update', payload)
   },
+  delete(payload) {
+    return postAction('/water/quota/delete', payload)
+  },
 }
 export const seedApi = {
   inventory(payload = {}) {
@@ -59,6 +71,12 @@ export const seedApi = {
   },
   create(payload) {
     return postAction('/seed/create', payload)
+  },
+  update(payload) {
+    return postAction('/seed/update', payload)
+  },
+  delete(payload) {
+    return postAction('/seed/delete', payload)
   },
   allocation(payload = {}) {
     return postAction('/seed/allocation', payload)
@@ -75,6 +93,12 @@ export const laborApi = {
   create(payload) {
     return postAction('/labor/create', payload)
   },
+  update(payload) {
+    return postAction('/labor/update', payload)
+  },
+  delete(payload) {
+    return postAction('/labor/delete', payload)
+  },
   schedule(payload = {}) {
     return postAction('/labor/schedule', payload)
   },
@@ -89,6 +113,12 @@ export const equipmentApi = {
   },
   create(payload) {
     return postAction('/equipment/create', payload)
+  },
+  update(payload) {
+    return postAction('/equipment/update', payload)
+  },
+  delete(payload) {
+    return postAction('/equipment/delete', payload)
   },
   status(payload = {}) {
     return postAction('/equipment/status', payload)

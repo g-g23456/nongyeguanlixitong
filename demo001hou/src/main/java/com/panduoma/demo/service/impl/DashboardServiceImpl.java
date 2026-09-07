@@ -139,7 +139,7 @@ public class DashboardServiceImpl implements DashboardService {
 
     private Map<String, Object> buildChart1() {
         List<ResourceOverview> records = resourceOverviewMapper.selectList(
-                new QueryWrapper<ResourceOverview>().orderByAsc("stat_month"));
+                new QueryWrapper<ResourceOverview>().orderByAsc("stat_mouth"));
 
         List<String> xAxis = new ArrayList<>();
         List<Number> farmlandData = new ArrayList<>();
@@ -149,7 +149,7 @@ public class DashboardServiceImpl implements DashboardService {
         List<Number> machineData = new ArrayList<>();
 
         for (ResourceOverview r : records) {
-            xAxis.add(formatMonth(r.getStatMonth()));
+            xAxis.add(formatMonth(r.getStatMouth()));
             farmlandData.add(r.getFarmland() != null ? r.getFarmland() : 0);
             waterData.add(r.getWater() != null ? r.getWater() : 0);
             materialData.add(r.getMaterial() != null ? r.getMaterial() : 0);
@@ -229,7 +229,7 @@ public class DashboardServiceImpl implements DashboardService {
 
     private Map<String, Object> buildChart3() {
         List<ResourceUtilTrend> records = resourceUtilTrendMapper.selectList(
-                new QueryWrapper<ResourceUtilTrend>().orderByAsc("stat_month"));
+                new QueryWrapper<ResourceUtilTrend>().orderByAsc("stat_mouth"));
 
         List<String> xAxis = new ArrayList<>();
         List<Number> landRates = new ArrayList<>();
@@ -238,7 +238,7 @@ public class DashboardServiceImpl implements DashboardService {
         List<Number> laborRates = new ArrayList<>();
 
         for (ResourceUtilTrend r : records) {
-            xAxis.add(formatMonth(r.getStatMonth()));
+            xAxis.add(formatMonth(r.getStatMouth()));
             landRates.add(r.getLandUtilRate() != null ? r.getLandUtilRate() : 0);
             waterRates.add(r.getWaterUtilRate() != null ? r.getWaterUtilRate() : 0);
             materialRates.add(r.getMaterialUtilRate() != null ? r.getMaterialUtilRate() : 0);
@@ -282,13 +282,13 @@ public class DashboardServiceImpl implements DashboardService {
     /**
      * 将 "YYYY-MM" 转为 "X月" 格式
      */
-    private String formatMonth(String statMonth) {
-        if (statMonth == null || statMonth.length() < 7) return statMonth;
+    private String formatMonth(String statMouth) {
+        if (statMouth == null || statMouth.length() < 7) return statMouth;
         try {
-            int month = Integer.parseInt(statMonth.substring(5, 7));
+            int month = Integer.parseInt(statMouth.substring(5, 7));
             return month + "月";
         } catch (Exception e) {
-            return statMonth;
+            return statMouth;
         }
     }
 }

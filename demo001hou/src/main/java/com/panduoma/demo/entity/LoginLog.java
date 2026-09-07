@@ -9,19 +9,19 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("login_log")
+@TableName("login_logs")
 public class LoginLog {
 
-    @TableId(value = "log_id", type = IdType.AUTO)
+    @TableId(value = "id", type = IdType.AUTO)
     private Long logId;
 
-    @TableField("u_id")
+    @TableField("user_id")
     private Long uId;
 
     @TableField("role")
     private String role;
 
-    @TableField("login_time")
+    @TableField("created_time")
     private LocalDateTime loginTime;
 
     @TableField("logout_time")

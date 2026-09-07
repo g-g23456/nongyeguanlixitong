@@ -26,6 +26,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -78,6 +79,7 @@ public class WaterServiceImpl implements WaterService {
         List<Map<String, Object>> items = new ArrayList<>();
         for (WaterQuota record : records) {
             Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", record.getId());
             item.put("area", record.getRegionId() != null
                     ? regionNameMap.getOrDefault(record.getRegionId(), "未知片区") : "未知片区");
             item.put("quota", record.getQuota());
@@ -277,7 +279,7 @@ public class WaterServiceImpl implements WaterService {
         return prompt.toString();
     }
 
-    private Map<String, Object> callDeepseek(String prompt) throws Exception {
+    private Map<String, Object> callDeepseek(String prompt) {
         String apiKey = StringUtils.hasText(deepseekApiKey)
                 ? deepseekApiKey
                 : System.getenv().getOrDefault("DEEPSEEK_API_KEY", "");
@@ -285,39 +287,48 @@ public class WaterServiceImpl implements WaterService {
             return buildFallbackAllocation();
         }
 
-        String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("model", "deepseek-chat");
-        payload.put("temperature", 0.2);
-        payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+        try {
+            String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("model", "deepseek-chat");
+            payload.put("temperature", 0.2);
+            payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/v1/chat/completions"))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-                .build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/chat/completions"))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .timeout(Duration.ofSeconds(60))
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
 
-        HttpClient httpClient = HttpClient.newHttpClient();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 400) {
-            throw new IllegalStateException("DeepSeek API 调用失败，HTTP 状态：" + response.statusCode());
-        }
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 400) {
+                System.err.println("DeepSeek API 返回错误状态: " + response.statusCode() + ", 回退到本地策略");
+                return buildFallbackAllocation();
+            }
 
-        Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
-        if (choices == null || choices.isEmpty()) {
+            Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
+            if (choices == null || choices.isEmpty()) {
+                return buildFallbackAllocation();
+            }
+
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            String content = Objects.toString(message.get("content"), "").trim();
+            if (content.startsWith("```")) {
+                content = content.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
+            }
+
+            Map<String, Object> result = objectMapper.readValue(content, Map.class);
+            return normalizeAllocationResult(result);
+        } catch (Exception e) {
+            System.err.println("DeepSeek API 调用失败: " + e.getMessage() + ", 回退到本地策略");
             return buildFallbackAllocation();
         }
-
-        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-        String content = Objects.toString(message.get("content"), "").trim();
-        if (content.startsWith("```")) {
-            content = content.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
-        }
-
-        Map<String, Object> result = objectMapper.readValue(content, Map.class);
-        return normalizeAllocationResult(result);
     }
 
     private Map<String, Object> buildFallbackAllocation() {
@@ -392,7 +403,7 @@ public class WaterServiceImpl implements WaterService {
         List<WaterAnalysis> records = waterAnalysisMapper.selectList(
                 new QueryWrapper<WaterAnalysis>().eq("year", year));
 
-        if (records.isEmpty()) {
+        if (records == null || records.isEmpty()) {
             return Result.data(buildEmptyAnalysisResult());
         }
 
@@ -524,7 +535,7 @@ public class WaterServiceImpl implements WaterService {
         Map<String, Object> trend = new LinkedHashMap<>();
         trend.put("months", Arrays.asList(months));
         trend.put("actual", List.of(0,0,0,0,0,0,0,0,0,0,0,0));
-        trend.put("predicted", List.of(null,null,null,null,null,null,null,null,null,null,null,null));
+        trend.put("predicted", Arrays.asList(null,null,null,null,null,null,null,null,null,null,null,null));
 
         Map<String, Object> waste = new LinkedHashMap<>();
         waste.put("categories", List.of(
@@ -599,5 +610,18 @@ public class WaterServiceImpl implements WaterService {
         }
 
         return Result.success("成功更新 " + updatedCount + " 条配额记录");
+    }
+
+    @Override
+    public Result<?> waterQuotaDelete(Long id) {
+        if (id == null) {
+            return Result.error("配额ID不能为空");
+        }
+        WaterQuota existing = waterQuotaMapper.selectById(id);
+        if (existing == null) {
+            return Result.error("配额记录不存在");
+        }
+        waterQuotaMapper.deleteById(id);
+        return Result.success("删除成功");
     }
 }

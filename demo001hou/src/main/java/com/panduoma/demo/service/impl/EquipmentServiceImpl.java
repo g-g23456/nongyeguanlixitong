@@ -33,6 +33,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -92,6 +93,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         List<Map<String, Object>> items = new ArrayList<>();
         for (Equipment record : records) {
             Map<String, Object> item = new LinkedHashMap<>();
+            item.put("dbId", record.getId());
             item.put("id", record.getEquipmentCode());
             item.put("name", record.getName());
             item.put("type", record.getType());
@@ -305,7 +307,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         return prompt.toString();
     }
 
-    private Map<String, Object> callDeepseekForDispatch(String prompt) throws Exception {
+    private Map<String, Object> callDeepseekForDispatch(String prompt) {
         String apiKey = StringUtils.hasText(deepseekApiKey)
                 ? deepseekApiKey
                 : System.getenv().getOrDefault("DEEPSEEK_API_KEY", "");
@@ -313,39 +315,48 @@ public class EquipmentServiceImpl implements EquipmentService {
             return buildFallbackDispatch();
         }
 
-        String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("model", "deepseek-chat");
-        payload.put("temperature", 0.2);
-        payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+        try {
+            String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("model", "deepseek-chat");
+            payload.put("temperature", 0.2);
+            payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/v1/chat/completions"))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-                .build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/chat/completions"))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .timeout(Duration.ofSeconds(60))
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
 
-        HttpClient httpClient = HttpClient.newHttpClient();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 400) {
-            throw new IllegalStateException("DeepSeek API 调用失败，HTTP 状态：" + response.statusCode());
-        }
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 400) {
+                System.err.println("DeepSeek API 返回错误状态: " + response.statusCode() + ", 回退到本地策略");
+                return buildFallbackDispatch();
+            }
 
-        Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
-        if (choices == null || choices.isEmpty()) {
+            Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
+            if (choices == null || choices.isEmpty()) {
+                return buildFallbackDispatch();
+            }
+
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            String content = Objects.toString(message.get("content"), "").trim();
+            if (content.startsWith("```")) {
+                content = content.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
+            }
+
+            Map<String, Object> result = objectMapper.readValue(content, Map.class);
+            return normalizeDispatchResult(result);
+        } catch (Exception e) {
+            System.err.println("DeepSeek API 调用失败: " + e.getMessage() + ", 回退到本地策略");
             return buildFallbackDispatch();
         }
-
-        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-        String content = Objects.toString(message.get("content"), "").trim();
-        if (content.startsWith("```")) {
-            content = content.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
-        }
-
-        Map<String, Object> result = objectMapper.readValue(content, Map.class);
-        return normalizeDispatchResult(result);
     }
 
     private Map<String, Object> normalizeDispatchResult(Map<String, Object> result) {
@@ -461,7 +472,7 @@ public class EquipmentServiceImpl implements EquipmentService {
     @Override
     public Result<?> equipmentMaintenance() {
         List<EquipmentMaintenance> records = equipmentMaintenanceMapper.selectList(
-                new QueryWrapper<EquipmentMaintenance>().orderByAsc("stat_month"));
+                new QueryWrapper<EquipmentMaintenance>().orderByAsc("stat_mouth"));
 
         int totalPlanCount = 0;
         int totalManageCount = 0;
@@ -477,12 +488,12 @@ public class EquipmentServiceImpl implements EquipmentService {
             totalProceedCount += r.getProceedCount() != null ? r.getProceedCount() : 0;
             totalOverdueCount += r.getOverdueCount() != null ? r.getOverdueCount() : 0;
 
-            if (r.getStatMonth() != null) {
-                String[] parts = r.getStatMonth().split("-");
+            if (r.getStatMouth() != null) {
+                String[] parts = r.getStatMouth().split("-");
                 if (parts.length == 2) {
                     months.add(Integer.parseInt(parts[1]) + "月");
                 } else {
-                    months.add(r.getStatMonth());
+                    months.add(r.getStatMouth());
                 }
             }
             costs.add(r.getTotalCost() != null ? r.getTotalCost() : BigDecimal.ZERO);
@@ -604,7 +615,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         return prompt.toString();
     }
 
-    private Map<String, Object> callDeepseekForAiDecision(String prompt) throws Exception {
+    private Map<String, Object> callDeepseekForAiDecision(String prompt) {
         String apiKey = StringUtils.hasText(deepseekApiKey)
                 ? deepseekApiKey
                 : System.getenv().getOrDefault("DEEPSEEK_API_KEY", "");
@@ -612,38 +623,47 @@ public class EquipmentServiceImpl implements EquipmentService {
             return buildFallbackAiDecision();
         }
 
-        String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("model", "deepseek-chat");
-        payload.put("temperature", 0.2);
-        payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+        try {
+            String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("model", "deepseek-chat");
+            payload.put("temperature", 0.2);
+            payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
 
-        HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/v1/chat/completions"))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-                .build();
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/chat/completions"))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .timeout(Duration.ofSeconds(60))
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
 
-        HttpClient httpClient = HttpClient.newHttpClient();
-        HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 400) {
-            throw new IllegalStateException("DeepSeek API 调用失败，HTTP 状态：" + response.statusCode());
-        }
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .build();
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 400) {
+                System.err.println("DeepSeek API 返回错误状态: " + response.statusCode() + ", 回退到本地策略");
+                return buildFallbackAiDecision();
+            }
 
-        Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
-        if (choices == null || choices.isEmpty()) {
+            Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
+            if (choices == null || choices.isEmpty()) {
+                return buildFallbackAiDecision();
+            }
+
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            String content = Objects.toString(message.get("content"), "").trim();
+            if (content.startsWith("```")) {
+                content = content.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
+            }
+
+            return objectMapper.readValue(content, Map.class);
+        } catch (Exception e) {
+            System.err.println("DeepSeek API 调用失败: " + e.getMessage() + ", 回退到本地策略");
             return buildFallbackAiDecision();
         }
-
-        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-        String content = Objects.toString(message.get("content"), "").trim();
-        if (content.startsWith("```")) {
-            content = content.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
-        }
-
-        return objectMapper.readValue(content, Map.class);
     }
 
     private Map<String, Object> buildAiDecisionResponse(List<Number> manualValues, Map<String, Object> aiResult) {
@@ -729,9 +749,9 @@ public class EquipmentServiceImpl implements EquipmentService {
         String year = request.get("year") != null ? request.get("year").toString() : String.valueOf(Calendar.getInstance().get(Calendar.YEAR));
         String area = request.get("area") != null ? request.get("area").toString() : "全部";
 
-        // 1. 构建查询条件：按年份（stat_month 前缀）和片区筛选
+        // 1. 构建查询条件：按年份（stat_mouth 前缀）和片区筛选
         QueryWrapper<PredictYield> qw = new QueryWrapper<>();
-        qw.likeRight("stat_month", year);
+        qw.likeRight("stat_mouth", year);
         if (!"全部".equals(area)) {
             // 根据片区名称查 region_id
             QueryWrapper<Region> regionQw = new QueryWrapper<>();
@@ -741,7 +761,7 @@ public class EquipmentServiceImpl implements EquipmentService {
                 qw.eq("region_id", region.getId());
             }
         }
-        qw.orderByAsc("stat_month", "crop");
+        qw.orderByAsc("stat_mouth", "crop");
         List<PredictYield> records = predictYieldMapper.selectList(qw);
 
         // 2. 按作物聚合月度数据（1~12月）
@@ -749,7 +769,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         Map<String, BigDecimal[]> cropMonthlyMap = new LinkedHashMap<>();
         for (PredictYield r : records) {
             String crop = r.getCrop() != null ? r.getCrop() : "未知";
-            int monthIdx = extractMonthIndex(r.getStatMonth());
+            int monthIdx = extractMonthIndex(r.getStatMouth());
             if (monthIdx < 0 || monthIdx > 11) continue;
             cropMonthlyMap.computeIfAbsent(crop, k -> {
                 BigDecimal[] arr = new BigDecimal[12];
@@ -891,12 +911,12 @@ public class EquipmentServiceImpl implements EquipmentService {
     }
 
     /**
-     * 从 stat_month（格式 YYYY-MM）中提取月份索引（0-11）
+     * 从 stat_mouth（格式 YYYY-MM）中提取月份索引（0-11）
      */
-    private int extractMonthIndex(String statMonth) {
-        if (statMonth == null) return -1;
+    private int extractMonthIndex(String statMouth) {
+        if (statMouth == null) return -1;
         try {
-            String[] parts = statMonth.split("-");
+            String[] parts = statMouth.split("-");
             if (parts.length == 2) {
                 return Integer.parseInt(parts[1]) - 1;
             }
@@ -955,7 +975,9 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
                 .build();
 
-        HttpClient httpClient = HttpClient.newHttpClient();
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
         HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 400) {
             throw new IllegalStateException("DeepSeek API 调用失败，HTTP 状态：" + response.statusCode());
@@ -1019,7 +1041,7 @@ public class EquipmentServiceImpl implements EquipmentService {
 
         // 1. 构建查询条件
         QueryWrapper<PredictResource> qw = new QueryWrapper<>();
-        qw.likeRight("stat_month", year);
+        qw.likeRight("stat_mouth", year);
         if (!"全部".equals(area)) {
             QueryWrapper<Region> regionQw = new QueryWrapper<>();
             regionQw.eq("name", area);
@@ -1028,7 +1050,7 @@ public class EquipmentServiceImpl implements EquipmentService {
                 qw.eq("region_id", region.getId());
             }
         }
-        qw.orderByAsc("stat_month");
+        qw.orderByAsc("stat_mouth");
         List<PredictResource> records = predictResourceMapper.selectList(qw);
 
         // 2. 按月聚合：waterDemand、fertilizerDemand、laborDemand
@@ -1040,7 +1062,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         Arrays.fill(laborMonthly, 0);
 
         for (PredictResource r : records) {
-            int monthIdx = extractMonthIndex(r.getStatMonth());
+            int monthIdx = extractMonthIndex(r.getStatMouth());
             if (monthIdx < 0 || monthIdx > 11) continue;
             waterMonthly[monthIdx] = waterMonthly[monthIdx].add(
                     r.getWaterDemand() != null ? r.getWaterDemand() : BigDecimal.ZERO);
@@ -1210,7 +1232,9 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
                 .build();
 
-        HttpClient httpClient = HttpClient.newHttpClient();
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
         HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 400) {
             throw new IllegalStateException("DeepSeek API 调用失败，HTTP 状态：" + response.statusCode());
@@ -1256,5 +1280,49 @@ public class EquipmentServiceImpl implements EquipmentService {
             if (arr[i] != null && arr[i] > 0) return arr[i];
         }
         return 0;
+    }
+
+    @Override
+    public Result<?> equipmentUpdate(Map<String, Object> request) {
+        if (request == null || request.get("id") == null) {
+            return Result.error("设备ID不能为空");
+        }
+        Long id = ((Number) request.get("id")).longValue();
+        Equipment existing = equipmentMapper.selectById(id);
+        if (existing == null) {
+            return Result.error("设备不存在");
+        }
+
+        if (request.containsKey("name")) existing.setName(request.get("name").toString());
+        if (request.containsKey("type")) existing.setType(request.get("type").toString());
+        if (request.containsKey("eff")) existing.setEfficiency(request.get("eff").toString());
+        if (request.containsKey("status")) existing.setStatus(request.get("status").toString());
+        if (request.containsKey("score")) existing.setScore(((Number) request.get("score")).intValue());
+
+        String areaName = request.get("area") != null ? request.get("area").toString() : null;
+        if (areaName != null) {
+            QueryWrapper<Region> regionQw = new QueryWrapper<>();
+            regionQw.eq("name", areaName);
+            Region region = regionMapper.selectOne(regionQw);
+            if (region != null) {
+                existing.setRegionId(region.getId());
+            }
+        }
+
+        equipmentMapper.updateById(existing);
+        return Result.success("更新成功");
+    }
+
+    @Override
+    public Result<?> equipmentDelete(Long id) {
+        if (id == null) {
+            return Result.error("设备ID不能为空");
+        }
+        Equipment existing = equipmentMapper.selectById(id);
+        if (existing == null) {
+            return Result.error("设备不存在");
+        }
+        equipmentMapper.deleteById(id);
+        return Result.success("删除成功");
     }
 }

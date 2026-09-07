@@ -23,8 +23,8 @@ public class PredictResource {
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @TableField("stat_month")
-    private String statMonth;
+    @TableField("stat_mouth")
+    private String statMouth;
 
     @TableField("region_id")
     private Long regionId;

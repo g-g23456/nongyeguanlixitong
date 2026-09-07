@@ -10,6 +10,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -26,7 +27,7 @@ public class Farmlandrotation {
     private Long blockId;
 
     @TableField("mouth")
-    private Integer mouth;
+    private LocalDate mouth;
 
     @TableField("plan")
     private String plan;

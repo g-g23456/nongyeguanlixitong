@@ -87,18 +87,6 @@
           </div>
           <button type="submit" class="login-btn">登 录</button>
         </form>
-
-        <div class="quick-login">
-          <p>快速登录（演示账号，点击一键填入）</p>
-          <div class="quick-btns">
-            <button type="button" class="quick-btn" @click="quickLogin('admin')">管理员</button>
-            <button type="button" class="quick-btn" @click="quickLogin('dispatcher')">
-              调度员
-            </button>
-            <button type="button" class="quick-btn" @click="quickLogin('farmer')">农户</button>
-            <button type="button" class="quick-btn" @click="quickLogin('analyst')">分析师</button>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -115,36 +103,6 @@ export default {
       username: '',
       password: '',
       errorMsg: '',
-      accounts: {
-        admin: {
-          username: 'admin',
-          password: 'admin123',
-          name: '张管理',
-          role: 'admin',
-          roleName: '系统管理员',
-        },
-        dispatcher: {
-          username: 'dispatcher',
-          password: 'dispatch123',
-          name: '李调度',
-          role: 'dispatcher',
-          roleName: '生产调度员',
-        },
-        farmer: {
-          username: 'farmer',
-          password: 'farmer123',
-          name: '王农户',
-          role: 'farmer',
-          roleName: '片区经理/农户',
-        },
-        analyst: {
-          username: 'analyst',
-          password: 'analyst123',
-          name: '赵分析',
-          role: 'analyst',
-          roleName: '数据分析师',
-        },
-      },
     }
   },
   mounted() {
@@ -183,10 +141,24 @@ export default {
           role: this.currentRole,
         })
 
+        console.log('=== 登录原始响应 ===', res)
+
         const result = res?.data || res
-        const user = result?.user || result
+        console.log('=== 提取 result(res?.data || res) ===', result)
+
+        const user = result?.user || (result?.id ? result : null)
+        console.log('=== 提取 user ===', user)
+
         const token = result?.token || result?.accessToken
-        const saToken = result?.saToken || result?.satoken || result?.tokenValue || result?.sa_token
+        const saToken =
+          result?.saToken ||
+          result?.satoken ||
+          result?.tokenValue ||
+          result?.sa_token ||
+          result?.token
+
+        console.log('=== token ===', token, '=== saToken ===', saToken)
+        console.log('=== user.role ===', user?.role)
 
         if (user && user.role) {
           if (token) {
@@ -199,29 +171,44 @@ export default {
           this.$emit('login-success', token ? { ...user, token, saToken } : user)
           return
         }
+
+        if (token || saToken) {
+          console.log('=== 响应中无 user 对象，尝试通过 token 获取用户信息 ===')
+          if (token) {
+            localStorage.setItem('agri_token', token)
+          }
+          if (saToken) {
+            localStorage.setItem('sa_token', saToken)
+          }
+          try {
+            const profileRes = await authApi.getProfile()
+            console.log('=== getProfile 响应 ===', profileRes)
+            const profileData = profileRes?.data || profileRes
+            const profileUser = profileData?.user || (profileData?.id ? profileData : null)
+            if (profileUser && profileUser.role) {
+              localStorage.setItem('agri_user', JSON.stringify(profileUser))
+              this.$emit('login-success', token ? { ...profileUser, token, saToken } : profileUser)
+              return
+            }
+            console.error('=== getProfile 返回的 user 无效 ===', profileUser)
+          } catch (profileError) {
+            console.error('=== getProfile 调用失败 ===', profileError)
+          }
+        }
+
+        const backendMsg = res?.message || res?.msg || result?.message || result?.msg
+        console.error('=== 登录失败：user 或 user.role 为空 ===', {
+          user,
+          role: user?.role,
+          res,
+          result,
+        })
+        this.showError(backendMsg || '登录失败：响应数据格式异常，请查看控制台日志')
       } catch (error) {
-        console.warn('后端登录接口不可用，回退到本地演示模式：', error)
-      }
-
-      const acc = Object.values(this.accounts).find(
-        (a) => a.username === this.username.trim() && a.password === this.password,
-      )
-      if (!acc) {
-        this.showError('用户名或密码错误')
+        console.error('=== 登录异常 ===', error)
+        this.showError('登录失败：' + (error.message || '后端服务不可用，请检查服务是否启动'))
         return
       }
-      if (acc.role !== this.currentRole) {
-        this.showError('角色不匹配，该账号是' + acc.roleName)
-        return
-      }
-
-      localStorage.setItem('agri_user', JSON.stringify(acc))
-      this.$emit('login-success', acc)
-    },
-    quickLogin(role) {
-      this.selectRole(role)
-      this.username = this.accounts[role].username
-      this.password = this.accounts[role].password
     },
   },
 }
@@ -566,41 +553,6 @@ export default {
 
 .login-btn:active {
   transform: translateY(0);
-}
-
-.quick-login {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.quick-login p {
-  font-size: 11px;
-  color: #999;
-  margin-bottom: 8px;
-  text-align: center;
-}
-
-.quick-btns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.quick-btn {
-  padding: 6px;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
-  background: #fff;
-  font-size: 11px;
-  color: #666;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.quick-btn:hover {
-  border-color: #52c41a;
-  color: #52c41a;
 }
 
 @media (max-width: 960px) {

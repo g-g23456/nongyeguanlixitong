@@ -25,9 +25,6 @@ public class User {
     @TableField("password")
     private String password;
 
-    @TableField("name")
-    private String name;
-
     @TableField("role")
     private String role;
 

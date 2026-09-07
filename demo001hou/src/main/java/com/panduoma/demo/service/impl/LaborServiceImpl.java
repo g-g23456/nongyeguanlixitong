@@ -23,6 +23,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -212,7 +213,7 @@ public class LaborServiceImpl implements LaborService {
         prompt.append("农田地块数据：\n");
         prompt.append(objectMapper.writeValueAsString(farmlands.stream().map(f -> {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("name", f.getBlockName());
+            m.put("name", f.getBlockCode());
             m.put("region", regionNameMap.getOrDefault(f.getRegionId(), "未知"));
             m.put("area", f.getArea());
             m.put("suitable_crops", f.getSuitableCrops());
@@ -230,7 +231,7 @@ public class LaborServiceImpl implements LaborService {
         return prompt.toString();
     }
 
-    private Map<String, Object> callDeepseekForSchedule(String prompt) throws Exception {
+    private Map<String, Object> callDeepseekForSchedule(String prompt) {
         String apiKey = StringUtils.hasText(deepseekApiKey)
                 ? deepseekApiKey
                 : System.getenv().getOrDefault("DEEPSEEK_API_KEY", "");
@@ -238,39 +239,47 @@ public class LaborServiceImpl implements LaborService {
             return buildFallbackSchedule();
         }
 
-        String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("model", "deepseek-chat");
-        payload.put("temperature", 0.2);
-        payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+        try {
+            String baseUrl = System.getProperty("deepseek.base-url", "https://api.deepseek.com");
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("model", "deepseek-chat");
+            payload.put("temperature", 0.2);
+            payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/v1/chat/completions"))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-                .build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/chat/completions"))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .timeout(Duration.ofSeconds(60))
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
 
-        HttpClient httpClient = HttpClient.newHttpClient();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 400) {
-            throw new IllegalStateException("DeepSeek API 调用失败，HTTP 状态：" + response.statusCode());
-        }
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 400) {
+                System.err.println("DeepSeek API 返回错误状态: " + response.statusCode() + ", 回退到本地策略");
+                return buildFallbackSchedule();
+            }
 
-        Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
-        if (choices == null || choices.isEmpty()) {
+            Map<String, Object> root = objectMapper.readValue(response.body(), Map.class);
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) root.get("choices");
+            if (choices == null || choices.isEmpty()) {
+                return buildFallbackSchedule();
+            }
+
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            String content = Objects.toString(message.get("content"), "").trim();
+            if (content.startsWith("```")) {
+                content = content.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
+            }
+
+            return objectMapper.readValue(content, Map.class);
+        } catch (Exception e) {
+            System.err.println("DeepSeek API 调用失败: " + e.getMessage() + ", 回退到本地策略");
             return buildFallbackSchedule();
         }
-
-        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-        String content = Objects.toString(message.get("content"), "").trim();
-        if (content.startsWith("```")) {
-            content = content.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
-        }
-
-        Map<String, Object> result = objectMapper.readValue(content, Map.class);
-        return result;
     }
 
     private Map<String, Object> buildFallbackSchedule() {
@@ -347,5 +356,50 @@ public class LaborServiceImpl implements LaborService {
         data.put("available", availableTime);
         data.put("status", workStatus);
         return Result.data("新增劳动力成功", data);
+    }
+
+    @Override
+    public Result<?> laborUpdate(Map<String, Object> request) {
+        if (request == null || request.get("id") == null) {
+            return Result.error("劳动力编号不能为空");
+        }
+        String laborId = request.get("id").toString();
+        LaborWorkers existing = laborWorkersMapper.selectById(laborId);
+        if (existing == null) {
+            return Result.error("劳动力不存在");
+        }
+
+        if (request.containsKey("name")) existing.setLaborName(request.get("name").toString());
+        if (request.containsKey("type")) existing.setWorkType(request.get("type").toString());
+        if (request.containsKey("level")) existing.setSkillLevel(request.get("level").toString());
+        if (request.containsKey("salary")) existing.setDailySalary(new BigDecimal(request.get("salary").toString()));
+        if (request.containsKey("available")) existing.setAvailableTime(request.get("available").toString());
+        if (request.containsKey("status")) existing.setWorkStatus(request.get("status").toString());
+
+        String areaName = request.get("area") != null ? request.get("area").toString() : null;
+        if (areaName != null) {
+            QueryWrapper<Region> regionQw = new QueryWrapper<>();
+            regionQw.eq("name", areaName);
+            Region region = regionMapper.selectOne(regionQw);
+            if (region != null) {
+                existing.setRegionId(region.getId());
+            }
+        }
+
+        laborWorkersMapper.updateById(existing);
+        return Result.success("更新成功");
+    }
+
+    @Override
+    public Result<?> laborDelete(String laborId) {
+        if (laborId == null || laborId.isBlank()) {
+            return Result.error("劳动力编号不能为空");
+        }
+        LaborWorkers existing = laborWorkersMapper.selectById(laborId);
+        if (existing == null) {
+            return Result.error("劳动力不存在");
+        }
+        laborWorkersMapper.deleteById(laborId);
+        return Result.success("删除成功");
     }
 }
