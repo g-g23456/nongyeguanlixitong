@@ -44,11 +44,11 @@ api.interceptors.request.use(
       config._aiKey = key
     }
 
-    const token = localStorage.getItem('agri_token')
+    const token = sessionStorage.getItem('agri_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
-    const saToken = localStorage.getItem('sa_token')
+    const saToken = sessionStorage.getItem('sa_token')
     if (saToken && saToken !== 'undefined') {
       config.headers['satoken'] = saToken
       if (config.url && !config.url.includes('/auth/login')) {
@@ -73,6 +73,16 @@ api.interceptors.response.use(
     const key = error.config?._aiKey
     if (key) {
       pendingMap.delete(key)
+    }
+    if (error.response) {
+      const status = error.response.status
+      if (status === 401) {
+        sessionStorage.removeItem('agri_user')
+        sessionStorage.removeItem('agri_token')
+        sessionStorage.removeItem('sa_token')
+        window.location.reload()
+        return Promise.reject(new Error('登录已过期，请重新登录'))
+      }
     }
     const message = error.response?.data?.message || error.message || '请求失败'
     return Promise.reject(new Error(message))

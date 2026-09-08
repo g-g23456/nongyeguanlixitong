@@ -113,49 +113,54 @@ public class WaterServiceImpl implements WaterService {
 
     @Override
     public Result<?> waterStatus() {
-        List<WaterQuota> records = waterQuotaMapper.selectList(new QueryWrapper<>());
+        List<Region> regions = regionMapper.selectList(new QueryWrapper<>());
 
-        // 填充片区名称
-        Set<Long> regionIds = records.stream()
-                .map(WaterQuota::getRegionId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<Long, String> regionNameMap = new HashMap<>();
-        if (!regionIds.isEmpty()) {
-            List<Region> regions = regionMapper.selectBatchIds(regionIds);
-            regionNameMap = regions.stream()
-                    .collect(Collectors.toMap(Region::getId, Region::getName, (a, b) -> a));
-        }
-
-        // traditional: 每个片区的配额(quota)
         List<Map<String, Object>> traditional = new ArrayList<>();
-        // aiOptimized: 每个片区的已用量(used)
-        List<Map<String, Object>> aiOptimized = new ArrayList<>();
-        // currentEfficiency: 每条记录的使用率(usage_rate)
         List<BigDecimal> currentEfficiency = new ArrayList<>();
 
-        for (WaterQuota record : records) {
-            String areaName = record.getRegionId() != null
-                    ? regionNameMap.getOrDefault(record.getRegionId(), "未知片区")
-                    : "未知片区";
+        for (Region region : regions) {
+            String areaName = region.getName() != null ? region.getName() : "未知片区";
+
+            List<WaterQuota> quotaList = waterQuotaMapper.selectList(
+                    new QueryWrapper<WaterQuota>().eq("region_id", region.getId()));
+
+            BigDecimal totalQuota = BigDecimal.ZERO;
+            BigDecimal totalUsed = BigDecimal.ZERO;
+            BigDecimal avgUsageRate = BigDecimal.ZERO;
+
+            if (!quotaList.isEmpty()) {
+                for (WaterQuota q : quotaList) {
+                    totalQuota = totalQuota.add(q.getQuota() != null ? q.getQuota() : BigDecimal.ZERO);
+                    totalUsed = totalUsed.add(q.getUsed() != null ? q.getUsed() : BigDecimal.ZERO);
+                }
+                avgUsageRate = totalQuota.compareTo(BigDecimal.ZERO) > 0
+                        ? totalUsed.divide(totalQuota, 4, RoundingMode.HALF_UP)
+                                .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO;
+            }
 
             Map<String, Object> tradItem = new LinkedHashMap<>();
             tradItem.put("area", areaName);
-            tradItem.put("value", record.getQuota() != null ? record.getQuota() : BigDecimal.ZERO);
+            tradItem.put("value", totalQuota);
             traditional.add(tradItem);
 
-            Map<String, Object> aiItem = new LinkedHashMap<>();
-            aiItem.put("area", areaName);
-            aiItem.put("value", record.getUsed() != null ? record.getUsed() : BigDecimal.ZERO);
-            aiOptimized.add(aiItem);
-
-            currentEfficiency.add(record.getUsageRate() != null ? record.getUsageRate() : BigDecimal.ZERO);
+            currentEfficiency.add(avgUsageRate);
         }
 
         // efficiency: 5 个指标评分 [节水灌溉, 产量保障, 均衡性, 利用率, 可持续性]
         List<BigDecimal> efficiency = new ArrayList<>();
-        for (WaterQuota record : records) {
-            efficiency.add(record.getUsageRate() != null ? record.getUsageRate() : BigDecimal.ZERO);
+        for (Region region : regions) {
+            List<WaterQuota> quotaList = waterQuotaMapper.selectList(
+                    new QueryWrapper<WaterQuota>().eq("region_id", region.getId()));
+            BigDecimal avgRate = BigDecimal.ZERO;
+            if (!quotaList.isEmpty()) {
+                BigDecimal sum = BigDecimal.ZERO;
+                for (WaterQuota q : quotaList) {
+                    sum = sum.add(q.getUsageRate() != null ? q.getUsageRate() : BigDecimal.ZERO);
+                }
+                avgRate = sum.divide(BigDecimal.valueOf(quotaList.size()), 2, RoundingMode.HALF_UP);
+            }
+            efficiency.add(avgRate);
         }
         // 补齐到 5 个元素
         while (efficiency.size() < 5) {
@@ -167,7 +172,6 @@ public class WaterServiceImpl implements WaterService {
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("traditional", traditional);
-        data.put("aiOptimized", aiOptimized);
         data.put("currentEfficiency", currentEfficiency);
         data.put("efficiency", efficiency);
         return Result.data(data);
@@ -182,35 +186,50 @@ public class WaterServiceImpl implements WaterService {
         String goal = Objects.toString(request.get("goal"), "节水最大化");
 
         try {
-            // 查询 water_quota 数据
-            List<WaterQuota> records = waterQuotaMapper.selectList(new QueryWrapper<>());
+            List<Region> allRegions = regionMapper.selectList(new QueryWrapper<>());
 
-            // 填充片区名称
-            Set<Long> regionIds = records.stream()
-                    .map(WaterQuota::getRegionId)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-            Map<Long, String> regionNameMap = new HashMap<>();
-            if (!regionIds.isEmpty()) {
-                List<Region> regions = regionMapper.selectBatchIds(regionIds);
-                regionNameMap = regions.stream()
-                        .collect(Collectors.toMap(Region::getId, Region::getName, (a, b) -> a));
-            }
-            for (WaterQuota record : records) {
-                if (record.getRegionId() != null) {
-                    record.setRegionName(regionNameMap.getOrDefault(record.getRegionId(), "未知片区"));
+            List<Map<String, Object>> aggregatedRecords = new ArrayList<>();
+            for (Region region : allRegions) {
+                String areaName = region.getName() != null ? region.getName() : "未知片区";
+
+                List<WaterQuota> quotaList = waterQuotaMapper.selectList(
+                        new QueryWrapper<WaterQuota>().eq("region_id", region.getId()));
+
+                BigDecimal totalQuota = BigDecimal.ZERO;
+                BigDecimal totalUsed = BigDecimal.ZERO;
+                BigDecimal totalRemain = BigDecimal.ZERO;
+                BigDecimal avgUsageRate = BigDecimal.ZERO;
+
+                if (!quotaList.isEmpty()) {
+                    for (WaterQuota q : quotaList) {
+                        totalQuota = totalQuota.add(q.getQuota() != null ? q.getQuota() : BigDecimal.ZERO);
+                        totalUsed = totalUsed.add(q.getUsed() != null ? q.getUsed() : BigDecimal.ZERO);
+                        totalRemain = totalRemain.add(q.getRemain() != null ? q.getRemain() : BigDecimal.ZERO);
+                    }
+                    avgUsageRate = totalQuota.compareTo(BigDecimal.ZERO) > 0
+                            ? totalUsed.divide(totalQuota, 4, RoundingMode.HALF_UP)
+                                    .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO;
                 }
+
+                Map<String, Object> record = new LinkedHashMap<>();
+                record.put("regionName", areaName);
+                record.put("regionId", region.getId());
+                record.put("quota", totalQuota);
+                record.put("used", totalUsed);
+                record.put("remain", totalRemain);
+                record.put("usageRate", avgUsageRate);
+                aggregatedRecords.add(record);
             }
 
             // 构建 prompt
-            String prompt = buildWaterAllocationPrompt(cycle, goal, records);
+            String prompt = buildWaterAllocationPrompt(cycle, goal, aggregatedRecords);
             Map<String, Object> deepseekResult = callDeepseek(prompt);
 
             // 将请求体和返回结果写入 water_ai_analysis
             try {
                 saveAIAnalysis(prompt, deepseekResult);
             } catch (Exception ex) {
-                // 写入失败不影响主流程返回
                 System.err.println("写入 water_ai_analysis 失败: " + ex.getMessage());
             }
 
@@ -263,7 +282,7 @@ public class WaterServiceImpl implements WaterService {
         }
     }
 
-    private String buildWaterAllocationPrompt(String cycle, String goal, List<WaterQuota> records) throws Exception {
+    private String buildWaterAllocationPrompt(String cycle, String goal, List<Map<String, Object>> records) throws Exception {
         StringBuilder prompt = new StringBuilder();
         prompt.append("你是农业水资源优化专家。请根据当前水位配额数据，给出最优水位分配方案。\n");
         prompt.append("分配周期：").append(cycle).append("\n");
@@ -337,10 +356,21 @@ public class WaterServiceImpl implements WaterService {
         result.put("yieldIncrease", 9.2);
 
         List<Map<String, Object>> plan = new ArrayList<>();
-        plan.add(Map.of("area", "东片区", "value", 800));
-        plan.add(Map.of("area", "西片区", "value", 650));
-        plan.add(Map.of("area", "南片区", "value", 550));
-        plan.add(Map.of("area", "北片区", "value", 450));
+        List<Region> regions = regionMapper.selectList(new QueryWrapper<>());
+        for (Region region : regions) {
+            List<WaterQuota> quotaList = waterQuotaMapper.selectList(
+                    new QueryWrapper<WaterQuota>().eq("region_id", region.getId()));
+            BigDecimal quota = BigDecimal.ZERO;
+            for (WaterQuota q : quotaList) {
+                quota = quota.add(q.getQuota() != null ? q.getQuota() : BigDecimal.ZERO);
+            }
+            plan.add(Map.of("area", region.getName() != null ? region.getName() : "未知片区",
+                    "value", quota.intValue()));
+        }
+        if (plan.isEmpty()) {
+            plan.add(Map.of("area", "东片区", "value", 800));
+            plan.add(Map.of("area", "西片区", "value", 650));
+        }
         result.put("plan", plan);
 
         result.put("efficiency", List.of(88, 92, 85, 90, 87));

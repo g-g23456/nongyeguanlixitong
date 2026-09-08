@@ -1,4 +1,4 @@
-﻿<template>
+﻿﻿<template>
   <div class="main-system" :class="'role-' + userInfo.role">
     <div class="loading-overlay" :class="{ active: loadingVisible }">
       <div class="spinner"></div>
@@ -663,11 +663,11 @@
               </div>
               <div class="chart-row">
                 <div class="chart-box">
-                  <div class="chart-title">🥧 优化后种植结构分布（玫瑰图）</div>
+                  <div class="chart-title">🥧 {{ optimizeDataFromAI ? '优化后' : '原始' }}种植结构分布（玫瑰图）</div>
                   <div ref="chartCropRose" style="height: 280px"></div>
                 </div>
                 <div class="chart-box">
-                  <div class="chart-title">📊 地块-作物适配度AI评分</div>
+                  <div class="chart-title">📊 {{ optimizeDataFromAI ? '地块-作物适配度AI评分' : '片区-作物分布（原始数据）' }}</div>
                   <div ref="chartCropScore" style="height: 280px"></div>
                 </div>
               </div>
@@ -2099,7 +2099,7 @@
                     <select v-model="systemUserCreateForm.role">
                       <option value="admin">系统管理员</option>
                       <option value="dispatcher">资源调度员</option>
-                      <option value="farmer">农户</option>
+                      <option value="farmer">片区经理</option>
                       <option value="analyst">数据分析师</option>
                     </select>
                   </div>
@@ -2320,44 +2320,9 @@ export default {
         { name: '其他', percentage: 4 },
       ],
       optimizeResult: null,
-      optimizeBlocks: [
-        {
-          blockId: 101,
-          blockCode: 'F001',
-          name: '北区A地块',
-          area: 320,
-          soilType: '壤土',
-          waterAvailability: 100,
-          fertilityScore: 85,
-        },
-        {
-          blockId: 102,
-          blockCode: 'F002',
-          name: '北区B地块',
-          area: 280,
-          soilType: '沙壤土',
-          waterAvailability: 90,
-          fertilityScore: 78,
-        },
-        {
-          blockId: 103,
-          blockCode: 'F003',
-          name: '南区A地块',
-          area: 260,
-          soilType: '红壤',
-          waterAvailability: 80,
-          fertilityScore: 82,
-        },
-        {
-          blockId: 104,
-          blockCode: 'F004',
-          name: '西区C地块',
-          area: 300,
-          soilType: '黄土',
-          waterAvailability: 88,
-          fertilityScore: 80,
-        },
-      ],
+      optimizeBlocks: [],
+      optimizeRegionData: [],
+      optimizeDataFromAI: false,
       openMenus: {
         farmland: false,
         water: false,
@@ -2368,7 +2333,7 @@ export default {
       },
       charts: {},
       loadingVisible: false,
-      loadingText: 'AI算法计算�?..',
+      loadingText: 'AI算法计算..',
       loadingDetail: '正在初始化..',
       aiOptimizeResultVisible: false,
       aiDecisionResultVisible: false,
@@ -3272,9 +3237,9 @@ export default {
     logout() {
       if (!confirm('确定要退出登录吗？')) return
       authApi.logout().catch(() => {})
-      localStorage.removeItem('agri_user')
-      localStorage.removeItem('agri_token')
-      localStorage.removeItem('sa_token')
+      sessionStorage.removeItem('agri_user')
+      sessionStorage.removeItem('agri_token')
+      sessionStorage.removeItem('sa_token')
       this.$emit('logout')
     },
     showLoading(text, detail) {
@@ -3291,19 +3256,56 @@ export default {
       })
     },
     async loadFarmlandOptimize() {
+      this.aiOptimizeResultVisible = false
+      this.optimizeDataFromAI = false
+      await this.loadBlocksByRegion()
+    },
+    async loadBlocksByRegion() {
       try {
-        const res = await farmlandApi.getLatestOptimize()
+        const res = await farmlandApi.getBlocksByRegion()
         const data = res?.data || res
         const result = data?.data || data || {}
+        const regions = result.regions || []
 
-        if (result && (result.cropDistribution || result.blockSuitability || result.optimizationMetrics)) {
-          this.normalizeOptimizeResult(result)
-          return
+        this.optimizeRegionData = regions
+
+        const blocks = []
+        for (const region of regions) {
+          const regionBlocks = region.blocks || []
+          for (const block of regionBlocks) {
+            blocks.push({
+              blockId: block.blockId,
+              blockCode: block.blockCode,
+              regionName: region.regionName,
+              area: block.area,
+              soilType: block.soilType,
+              currentCrop: block.currentCrop,
+              suitableCrops: block.suitableCrops,
+              status: block.status,
+            })
+          }
+        }
+        this.optimizeBlocks = blocks
+
+        const regionNames = regions.map((r) => r.regionName)
+        const cropCountMap = {}
+        for (const block of blocks) {
+          const crop = block.currentCrop || '未种植'
+          cropCountMap[crop] = (cropCountMap[crop] || 0) + 1
+        }
+        const total = blocks.length || 1
+        const cropDistribution = Object.entries(cropCountMap).map(([name, count]) => ({
+          name,
+          percentage: (count / total) * 100,
+        }))
+        if (cropDistribution.length > 0) {
+          this.optimizeCropDistribution = cropDistribution
         }
       } catch (error) {
-        console.warn('加载最新优化结果失败:', error)
+        console.warn('加载地块片区数据失败:', error)
+      } finally {
+        this.$nextTick(() => this.initCropCharts())
       }
-      this.$nextTick(() => this.initCropCharts())
     },
     async runAIOptimize() {
       this.showLoading('AI种植结构优化计算..', '遗传算法初始化种群（500个体）..')
@@ -3322,6 +3324,7 @@ export default {
           (result.cropDistribution || result.blockSuitability || result.optimizationMetrics)
         ) {
           this.normalizeOptimizeResult(result)
+          this.optimizeDataFromAI = true
           this.hideLoading()
           return
         }
@@ -3752,41 +3755,58 @@ export default {
           }))
         : []
 
-      const scoreSeries = this.optimizeResult?.blockSuitability?.length
-        ? this.optimizeResult.blockSuitability.map((item) => ({
-            name: item.recommendedCrop || '建议作物',
-            type: 'bar',
-            data: [Number(item.suitabilityScore || 0)],
-            itemStyle: {
-              color: ['#52c41a', '#faad14', '#1890ff', '#722ed1'][
-                this.optimizeResult.blockSuitability.indexOf(item) % 4
-              ],
-            },
-            barWidth: 18,
-          }))
-        : [
-            {
-              name: '水稻',
-              type: 'bar',
-              data: [92, 65, 45, 70],
-              itemStyle: { color: '#52c41a' },
-              barWidth: 20,
-            },
-            {
-              name: '小麦',
-              type: 'bar',
-              data: [55, 88, 72, 85],
-              itemStyle: { color: '#faad14' },
-              barWidth: 20,
-            },
-            {
-              name: '玉米',
-              type: 'bar',
-              data: [48, 75, 90, 65],
-              itemStyle: { color: '#1890ff' },
-              barWidth: 20,
-            },
-          ]
+      const xAxisData = this.optimizeRegionData.length
+        ? this.optimizeRegionData.map((r) => r.regionName)
+        : this.optimizeBlocks.map((item) => item.blockCode)
+
+      let scoreSeries
+      if (this.optimizeDataFromAI && this.optimizeResult?.blockSuitability?.length) {
+        const blockRegionMap = {}
+        for (const block of this.optimizeBlocks) {
+          blockRegionMap[block.blockCode] = block.regionName
+        }
+        const regionNames = this.optimizeRegionData.map((r) => r.regionName)
+        const cropSeriesMap = {}
+        for (const item of this.optimizeResult.blockSuitability) {
+          const regionName = blockRegionMap[item.blockCode] || item.blockCode
+          const crop = item.recommendedCrop || '建议作物'
+          if (!cropSeriesMap[crop]) {
+            cropSeriesMap[crop] = {}
+            for (const rn of regionNames) {
+              cropSeriesMap[crop][rn] = 0
+            }
+          }
+          cropSeriesMap[crop][regionName] = Math.max(cropSeriesMap[crop][regionName] || 0, Number(item.suitabilityScore || 0))
+        }
+        const colors = ['#52c41a', '#faad14', '#1890ff', '#722ed1', '#eb2f96', '#13c2c2', '#f759ab', '#fa8c16']
+        scoreSeries = Object.entries(cropSeriesMap).map(([crop, regionData], idx) => ({
+          name: crop,
+          type: 'bar',
+          data: regionNames.map((rn) => regionData[rn] || 0),
+          itemStyle: { color: colors[idx % colors.length] },
+          barWidth: 20,
+        }))
+      } else {
+        const cropSet = new Set()
+        for (const block of this.optimizeBlocks) {
+          const crop = block.currentCrop || '未种植'
+          cropSet.add(crop)
+        }
+        const crops = [...cropSet]
+        const colors = ['#52c41a', '#faad14', '#1890ff', '#722ed1', '#eb2f96']
+        scoreSeries = crops.map((crop, idx) => ({
+          name: crop,
+          type: 'bar',
+          data: this.optimizeRegionData.length
+            ? this.optimizeRegionData.map((region) => {
+                const regionBlocks = region.blocks || []
+                return regionBlocks.filter((b) => (b.currentCrop || '未种植') === crop).length
+              })
+            : this.optimizeBlocks.map((b) => ((b.currentCrop || '未种植') === crop ? 1 : 0)),
+          itemStyle: { color: colors[idx % colors.length] },
+          barWidth: 20,
+        }))
+      }
 
       const c1 = echarts.init(this.$refs.chartCropRose)
       c1.setOption({
@@ -3809,7 +3829,7 @@ export default {
         tooltip: { trigger: 'axis' },
         xAxis: {
           type: 'category',
-          data: this.optimizeBlocks.map((item) => item.blockCode),
+          data: xAxisData,
         },
         yAxis: { type: 'value', name: '适配度', max: 100 },
         series: scoreSeries,
@@ -3892,34 +3912,62 @@ export default {
       const areas = tradArr.map((item) => item.area)
       const tradVals = tradArr.map((item) => item.value)
       const aiVals = aiArr.map((item) => item.value)
+      const hasAI = aiArr.length > 0
       const c1 = echarts.init(this.$refs.chartWaterCompare)
+      const legendData = hasAI ? ['传统方案', 'AI优化方案'] : ['传统方案']
+      const series = [
+        {
+          name: '传统方案',
+          type: 'bar',
+          data: tradVals,
+          itemStyle: { color: '#faad14' },
+        },
+      ]
+      if (hasAI) {
+        series.push({
+          name: 'AI优化方案',
+          type: 'bar',
+          data: aiVals,
+          itemStyle: { color: '#52c41a' },
+        })
+      }
       c1.setOption({
         tooltip: { trigger: 'axis' },
-        legend: { data: ['传统方案', 'AI优化方案'], bottom: 0 },
+        legend: { data: legendData, bottom: 0 },
         xAxis: { type: 'category', data: areas },
         yAxis: { type: 'value', name: '万m³' },
-        series: [
-          {
-            name: '传统方案',
-            type: 'bar',
-            data: tradVals,
-            itemStyle: { color: '#faad14' },
-          },
-          {
-            name: 'AI优化方案',
-            type: 'bar',
-            data: aiVals,
-            itemStyle: { color: '#52c41a' },
-          },
-        ],
+        series: series,
       })
       this.charts['water-compare'] = c1
       const curEff = d.currentEfficiency || []
       const aiEff = d.aiEfficiency || []
+      const hasAIEff = aiEff.length > 0
       const c2 = echarts.init(this.$refs.chartWaterRadar)
+      const radarLegendData = hasAIEff ? ['当前效率', 'AI优化'] : ['当前效率']
+      const radarSeries = [
+        {
+          type: 'radar',
+          data: [
+            {
+              value: curEff,
+              name: '当前效率',
+              itemStyle: { color: '#faad14' },
+              areaStyle: { opacity: 0.2 },
+            },
+          ],
+        },
+      ]
+      if (hasAIEff) {
+        radarSeries[0].data.push({
+          value: aiEff,
+          name: 'AI优化',
+          itemStyle: { color: '#52c41a' },
+          areaStyle: { opacity: 0.3 },
+        })
+      }
       c2.setOption({
         tooltip: {},
-        legend: { data: ['当前效率', 'AI优化'], bottom: 0 },
+        legend: { data: radarLegendData, bottom: 0 },
         radar: {
           indicator: [
             { name: '节水灌溉', max: 100 },
@@ -3930,25 +3978,7 @@ export default {
           ],
           radius: '60%',
         },
-        series: [
-          {
-            type: 'radar',
-            data: [
-              {
-                value: curEff,
-                name: '当前效率',
-                itemStyle: { color: '#faad14' },
-                areaStyle: { opacity: 0.2 },
-              },
-              {
-                value: aiEff,
-                name: 'AI优化',
-                itemStyle: { color: '#52c41a' },
-                areaStyle: { opacity: 0.3 },
-              },
-            ],
-          },
-        ],
+        series: radarSeries,
       })
       this.charts['water-radar'] = c2
     },

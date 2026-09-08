@@ -341,6 +341,64 @@ public class FarmlandServiceImpl implements FarmlandService {
         }
     }
 
+    @Override
+    public Result<?> getBlocksByRegion() {
+        List<FarmlandBlock> blocks = farmlandBlockMapper.selectList(new QueryWrapper<>());
+
+        Set<Long> regionIds = blocks.stream()
+                .map(FarmlandBlock::getRegionId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, Region> regionMap = new HashMap<>();
+        if (!regionIds.isEmpty()) {
+            List<Region> regions = regionMapper.selectBatchIds(regionIds);
+            for (Region r : regions) {
+                regionMap.put(r.getId(), r);
+            }
+        }
+
+        Map<String, Map<String, Object>> regionAgg = new LinkedHashMap<>();
+        for (FarmlandBlock block : blocks) {
+            String regionName = regionMap.containsKey(block.getRegionId())
+                    ? regionMap.get(block.getRegionId()).getName()
+                    : "未知片区";
+
+            regionAgg.computeIfAbsent(regionName, k -> {
+                Map<String, Object> agg = new LinkedHashMap<>();
+                agg.put("regionName", regionName);
+                agg.put("blocks", new ArrayList<Map<String, Object>>());
+                agg.put("totalArea", 0.0);
+                agg.put("blockCount", 0);
+                return agg;
+            });
+
+            Map<String, Object> agg = regionAgg.get(regionName);
+            agg.put("totalArea", ((Number) agg.get("totalArea")).doubleValue()
+                    + (block.getArea() != null ? block.getArea().doubleValue() : 0));
+            agg.put("blockCount", ((Number) agg.get("blockCount")).intValue() + 1);
+
+            Map<String, Object> blockInfo = new LinkedHashMap<>();
+            blockInfo.put("blockId", block.getId());
+            blockInfo.put("blockCode", block.getBlockCode());
+            blockInfo.put("area", block.getArea());
+            blockInfo.put("soilType", block.getSoilType());
+            blockInfo.put("currentCrop", block.getCurrentCrop());
+            blockInfo.put("suitableCrops", parseSuitableCrops(block.getSuitableCrops()));
+            blockInfo.put("status", block.getStatus());
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> blockList = (List<Map<String, Object>>) agg.get("blocks");
+            blockList.add(blockInfo);
+        }
+
+        List<Map<String, Object>> regionList = new ArrayList<>(regionAgg.values());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("regions", regionList);
+        result.put("totalBlocks", blocks.size());
+        return Result.data(result);
+    }
+
     // ==================== 私有辅助方法 ====================
 
     private String buildDeepseekPrompt(FarmlandOptimizeRequest request, List<FarmlandBlock> blocks) throws JsonProcessingException {

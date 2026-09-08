@@ -106,13 +106,13 @@ export default {
     }
   },
   mounted() {
-    const saved = localStorage.getItem('agri_user')
+    const saved = sessionStorage.getItem('agri_user')
     if (saved) {
       try {
         const userData = JSON.parse(saved)
         this.$emit('login-success', userData)
       } catch (e) {
-        localStorage.removeItem('agri_user')
+        sessionStorage.removeItem('agri_user')
       }
     }
   },
@@ -162,12 +162,12 @@ export default {
 
         if (user && user.role) {
           if (token) {
-            localStorage.setItem('agri_token', token)
+            sessionStorage.setItem('agri_token', token)
           }
           if (saToken) {
-            localStorage.setItem('sa_token', saToken)
+            sessionStorage.setItem('sa_token', saToken)
           }
-          localStorage.setItem('agri_user', JSON.stringify(user))
+          sessionStorage.setItem('agri_user', JSON.stringify(user))
           this.$emit('login-success', token ? { ...user, token, saToken } : user)
           return
         }
@@ -175,10 +175,10 @@ export default {
         if (token || saToken) {
           console.log('=== 响应中无 user 对象，尝试通过 token 获取用户信息 ===')
           if (token) {
-            localStorage.setItem('agri_token', token)
+            sessionStorage.setItem('agri_token', token)
           }
           if (saToken) {
-            localStorage.setItem('sa_token', saToken)
+            sessionStorage.setItem('sa_token', saToken)
           }
           try {
             const profileRes = await authApi.getProfile()
@@ -186,7 +186,7 @@ export default {
             const profileData = profileRes?.data || profileRes
             const profileUser = profileData?.user || (profileData?.id ? profileData : null)
             if (profileUser && profileUser.role) {
-              localStorage.setItem('agri_user', JSON.stringify(profileUser))
+              sessionStorage.setItem('agri_user', JSON.stringify(profileUser))
               this.$emit('login-success', token ? { ...profileUser, token, saToken } : profileUser)
               return
             }

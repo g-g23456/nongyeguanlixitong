@@ -21,40 +21,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
-//POST /auth/login   登录
-//POST /auth/me      获取当前用户信息
-//POST /auth/logout   登出
-//POST /dashboard/overview   获取看板数据
-
-//POST /farmland/list     获取所有农田
-//POST /farmland/create   创建农田
-//POST /farmland/optimize  ai优化农田布局
-//POST /farmland/rotation  休耕计划
-
-//POST /water/status
-//POST /water/quota     水位配额
-//POST /water/quota/update    配置调整
-//POST /water/allocation    ai水位分配
-//POST /water/analysis    水位分析
-//POST /seed/inventory    种子库存
-//POST /seed/create       入库登记
-//POST /seed/allocation  ai需求分配
-//POST /seed/predict   消耗预测与库存预警
-//POST /labor/list    劳动力列表
-//POST /labor/create    新增劳动力
-//POST /labor/old/schedule  劳动力排班
-//POST /labor/schedule  智能排班调度
-//POST /equipment/list  农机具台账管理
-//POST /equipment/create  新增设备
-//POST /equipment/status  原始设备调配分布
-//POST /equipment/allocation   智能调配与路径优化
-//POST /equipment/maintenance    维护保养管理
-//POST /ai/decision    AI综合决策中心
-//POST /predict/yield   作物产量预测
-//POST /predict/resource   资源需求智能预测
-//POST /system/users    系统用户管理
-//POST /system/create   创建用户
-
 @Tag(name = "农业管理系统")
 @RestController
 @RequestMapping("/api")
@@ -93,6 +59,7 @@ public class Controller {
             Map<String, Object> data = new HashMap<>();
             data.put("user", loginUser);
             data.put("token", token);
+            data.put("satoken", token);
             return Result.data(data);
         }
         return res;
@@ -146,6 +113,12 @@ public class Controller {
     @PostMapping("/farmland/optimize/latest")
     public Result<?> farmlandOptimizeLatest() {
         return farmlandService.getLatestOptimize();
+    }
+
+    @Operation(summary = "获取按片区聚合的地块原始数据")
+    @PostMapping("/farmland/optimize/blocks")
+    public Result<?> farmlandOptimizeBlocks() {
+        return farmlandService.getBlocksByRegion();
     }
 
     @Operation(summary = "获取地块轮作历史数据")

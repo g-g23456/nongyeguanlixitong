@@ -40,4 +40,9 @@ public interface FarmlandService {
      * 获取最新的优化结果
      */
     Result<?> getLatestOptimize();
+
+    /**
+     * 获取按片区聚合的地块原始数据（用于AI优化页面初始渲染）
+     */
+    Result<?> getBlocksByRegion();
 }

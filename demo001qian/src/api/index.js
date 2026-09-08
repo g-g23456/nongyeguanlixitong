@@ -10,7 +10,7 @@ export const authApi = {
     return postAction('/auth/me', payload)
   },
   logout() {
-    const saToken = localStorage.getItem('sa_token')
+    const saToken = sessionStorage.getItem('sa_token')
     return postAction('/auth/logout', { satoken: saToken })
   },
 }
@@ -39,6 +39,9 @@ export const farmlandApi = {
   },
   getLatestOptimize(payload = {}) {
     return postAction('/farmland/optimize/latest', payload)
+  },
+  getBlocksByRegion(payload = {}) {
+    return postAction('/farmland/optimize/blocks', payload)
   },
   rotation(payload = {}) {
     return postAction('/farmland/rotation', payload)

@@ -30,6 +30,7 @@ public class PermissionPaths {
         map.put("/api/farmland/create", "farmland:create");
         map.put("/api/farmland/optimize", "farmland:optimize");
         map.put("/api/farmland/optimize/latest", "farmland:optimize");
+        map.put("/api/farmland/optimize/blocks", "farmland:optimize");
         map.put("/api/farmland/rotation", "farmland:rotation");
 
         // ===== 用水管理 =====

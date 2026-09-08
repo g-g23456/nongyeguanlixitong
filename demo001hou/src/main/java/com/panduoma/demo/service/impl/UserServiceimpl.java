@@ -144,6 +144,9 @@ public class UserServiceimpl extends ServiceImpl<UserMapper, User> implements Us
         List<User> users = baseMapper.selectList(null);
         for (User user : users) {
             user.setPassword(null);
+            if (user.getRoleName() == null || user.getRoleName().isBlank()) {
+                user.setRoleName(getRoleDisplayName(user.getRole()));
+            }
         }
 
         // 3. 组装响应
@@ -182,10 +185,22 @@ public class UserServiceimpl extends ServiceImpl<UserMapper, User> implements Us
         user.setUsername(username);
         user.setPassword(password);
         user.setRole(role);
+        user.setRoleName(getRoleDisplayName(role));
         user.setDepartment(department);
         user.setStatus(status);
 
         baseMapper.insert(user);
         return Result.success("创建成功");
+    }
+
+    private String getRoleDisplayName(String role) {
+        if (role == null) return "未知角色";
+        switch (role) {
+            case "admin": return "系统管理员";
+            case "dispatcher": return "资源调度员";
+            case "farmer": return "片区经理";
+            case "analyst": return "数据分析师";
+            default: return role;
+        }
     }
 }

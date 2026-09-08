@@ -27,62 +27,52 @@ export default {
     }
   },
   mounted() {
-    const savedUser = localStorage.getItem('agri_user')
-    const token = localStorage.getItem('agri_token')
+    const savedUser = sessionStorage.getItem('agri_user')
+    const token = sessionStorage.getItem('agri_token')
 
     if (token) {
       authApi
         .getProfile()
         .then((res) => {
-          const user = res?.data || res?.user || res || JSON.parse(savedUser || '{}')
+          const user = res?.data || res?.user || res || (savedUser ? JSON.parse(savedUser) : {})
           if (user && user.role) {
             this.userInfo = user
             this.isLoggedIn = true
-            localStorage.setItem('agri_user', JSON.stringify(user))
+            sessionStorage.setItem('agri_user', JSON.stringify(user))
+          } else {
+            this.clearLoginState()
           }
         })
         .catch(() => {
-          if (savedUser) {
-            try {
-              this.userInfo = JSON.parse(savedUser)
-              this.isLoggedIn = true
-            } catch (e) {
-              localStorage.removeItem('agri_user')
-              localStorage.removeItem('agri_token')
-            }
-          }
+          this.clearLoginState()
         })
       return
     }
 
-    if (savedUser) {
-      try {
-        this.userInfo = JSON.parse(savedUser)
-        this.isLoggedIn = true
-      } catch (e) {
-        localStorage.removeItem('agri_user')
-      }
-    }
+    this.clearLoginState()
   },
   methods: {
+    clearLoginState() {
+      this.isLoggedIn = false
+      this.userInfo = { name: '', role: '', roleName: '' }
+      sessionStorage.removeItem('agri_user')
+      sessionStorage.removeItem('agri_token')
+      sessionStorage.removeItem('sa_token')
+    },
     handleLoginSuccess(userData) {
       const finalUser = userData && userData.user ? userData.user : userData
       this.userInfo = finalUser
       this.isLoggedIn = true
       if (userData && userData.token) {
-        localStorage.setItem('agri_token', userData.token)
+        sessionStorage.setItem('agri_token', userData.token)
       }
       if (userData && userData.saToken) {
-        localStorage.setItem('sa_token', userData.saToken)
+        sessionStorage.setItem('sa_token', userData.saToken)
       }
-      localStorage.setItem('agri_user', JSON.stringify(finalUser))
+      sessionStorage.setItem('agri_user', JSON.stringify(finalUser))
     },
     handleLogout() {
-      this.isLoggedIn = false
-      this.userInfo = { name: '', role: '', roleName: '' }
-      localStorage.removeItem('agri_user')
-      localStorage.removeItem('agri_token')
-      localStorage.removeItem('sa_token')
+      this.clearLoginState()
       authApi.logout().catch(() => {})
     },
   },
