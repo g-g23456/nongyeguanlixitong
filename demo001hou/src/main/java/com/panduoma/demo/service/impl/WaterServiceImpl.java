@@ -250,6 +250,13 @@ public class WaterServiceImpl implements WaterService {
         BigDecimal utilizationRate   = toBigDecimal(efficiency.size() > 3 ? efficiency.get(3) : 0);
         BigDecimal sustainability    = toBigDecimal(efficiency.size() > 4 ? efficiency.get(4) : 0);
 
+        String requestJson;
+        try {
+            requestJson = objectMapper.writeValueAsString(prompt);
+        } catch (Exception e) {
+            requestJson = "\"" + prompt.replace("\"", "\\\"") + "\"";
+        }
+
         String resultJson;
         try {
             resultJson = objectMapper.writeValueAsString(aiResult);
@@ -260,7 +267,7 @@ public class WaterServiceImpl implements WaterService {
         WaterAIAnalysis analysis = WaterAIAnalysis.builder()
                 .taskId(taskId)
                 .regionId(0L)
-                .request(prompt)
+                .request(requestJson)
                 .result(resultJson)
                 .waterSavingIrrigation(waterSavingIrrigation)
                 .sustainability(sustainability)
