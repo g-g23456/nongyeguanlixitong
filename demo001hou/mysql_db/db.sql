@@ -1,7 +1,6 @@
-CREATE DATABASE IF NOT EXISTS user_role_data;
-desc farmland_blocks;
 
-drop DATABASE if EXISTS user_role_data;
+CREATE DATABASE IF NOT EXISTS user_role_data;
+
 CREATE TABLE IF NOT EXISTS `user_data` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `username` VARCHAR(128) NOT NULL,
