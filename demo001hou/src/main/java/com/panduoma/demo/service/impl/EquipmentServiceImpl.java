@@ -848,6 +848,15 @@ public class EquipmentServiceImpl implements EquipmentService {
         // 计算每种作物全年总值（用于饼图）
         Map<String, BigDecimal> cropTotalMap = new LinkedHashMap<>();
 
+        // 如果数据库无数据，为三种作物添加默认空数组，确保前端图表正常渲染
+        if (cropMonthlyMap.isEmpty()) {
+            BigDecimal[] emptyArr = new BigDecimal[12];
+            Arrays.fill(emptyArr, BigDecimal.ZERO);
+            cropMonthlyMap.put("水稻", emptyArr.clone());
+            cropMonthlyMap.put("小麦", emptyArr.clone());
+            cropMonthlyMap.put("玉米", emptyArr.clone());
+        }
+
         for (Map.Entry<String, BigDecimal[]> entry : cropMonthlyMap.entrySet()) {
             String crop = entry.getKey();
             String key = cropKeyMap.getOrDefault(crop, crop);
@@ -899,7 +908,7 @@ public class EquipmentServiceImpl implements EquipmentService {
 
         // 7. 组装返回
         List<String> areaOptions = List.of("全部", "北区", "南区", "东区", "西区");
-        List<String> yearOptions = List.of("2020", "2021", "2022", "2023", "2024", "2025");
+        List<String> yearOptions = List.of("2020", "2021", "2022", "2023", "2024", "2025", "2026");
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("trend", trend);
@@ -1169,7 +1178,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("months", Arrays.asList(monthLabels));
         data.put("areaOptions", List.of("全部", "北区", "南区", "东区", "西区"));
-        data.put("yearOptions", List.of("2020", "2021", "2022", "2023", "2024", "2025"));
+        data.put("yearOptions", List.of("2020", "2021", "2022", "2023", "2024", "2025", "2026"));
         data.put("water", waterData);
         data.put("seed", seedData);
 

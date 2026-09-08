@@ -442,9 +442,11 @@ public class WaterServiceImpl implements WaterService {
                 analysis = new HashMap<>();
             }
 
-            // 提取月度数据并累加到趋势图
-            List<Number> monthlyActual = (List<Number>) analysis.getOrDefault("monthlyActual", null);
-            List<Number> monthlyPredicted = (List<Number>) analysis.getOrDefault("monthlyPredicted", null);
+            // 提取月度数据并累加到趋势图（兼容 mouthly/montly 拼写变体）
+            List<Number> monthlyActual = (List<Number>) analysis.getOrDefault("monthlyActual",
+                    analysis.getOrDefault("mouthlyActual", null));
+            List<Number> monthlyPredicted = (List<Number>) analysis.getOrDefault("monthlyPredicted",
+                    analysis.getOrDefault("mouthlyPredicted", null));
             for (int i = 0; i < 12; i++) {
                 if (monthlyActual != null && i < monthlyActual.size() && monthlyActual.get(i) != null) {
                     actualSum[i] += monthlyActual.get(i).doubleValue();

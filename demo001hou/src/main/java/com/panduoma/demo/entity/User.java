@@ -30,7 +30,7 @@ public class User {
 
     @TableField("role_name")
     @JsonProperty("roleName")
-    private String role_name;
+    private String roleName;
 
     @TableField("department")
     private String department;

@@ -2149,7 +2149,6 @@
                   <tr>
                     <th>用户ID</th>
                     <th>用户名</th>
-                    <th>姓名</th>
                     <th>角色</th>
                     <th>部门</th>
                     <th>状态</th>
@@ -2157,15 +2156,14 @@
                 </thead>
                 <tbody>
                   <tr v-if="systemUsersLoading">
-                    <td colspan="6" style="text-align: center; padding: 20px">加载中...</td>
+                    <td colspan="5" style="text-align: center; padding: 20px">加载中...</td>
                   </tr>
                   <tr v-else-if="systemUsers.length === 0">
-                    <td colspan="6" style="text-align: center; padding: 20px">暂无数据</td>
+                    <td colspan="5" style="text-align: center; padding: 20px">暂无数据</td>
                   </tr>
                   <tr v-for="user in systemUsers" :key="user.userId">
                     <td>{{ user.userId }}</td>
                     <td>{{ user.username }}</td>
-                    <td>{{ user.name }}</td>
                     <td>
                       <span class="tag" :class="roleTagClass(user.role)">{{ user.roleName }}</span>
                     </td>
@@ -2377,16 +2375,16 @@ export default {
       aiDecisionData: null,
       aiDecisionPeriod: '2025年度',
       aiDecisionDimension: '五维全优化',
-      yieldTrendYear: '2025',
+      yieldTrendYear: '2026',
       yieldTrendArea: '全部',
       yieldData: null,
       yieldAreaOptions: ['全部'],
-      yieldYearOptions: ['2025'],
-      resourcePredictYear: '2025',
+      yieldYearOptions: ['2026'],
+      resourcePredictYear: '2026',
       resourcePredictArea: '全部',
       resourcePredictData: null,
       resourceAreaOptions: ['全部'],
-      resourceYearOptions: ['2025'],
+      resourceYearOptions: ['2026'],
       systemUsers: [],
       systemUsersLoading: false,
       showSystemUserCreateForm: false,
